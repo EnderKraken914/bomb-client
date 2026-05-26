@@ -19,8 +19,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("Bomb Client")]
 [assembly: AssemblyCompany("EnderKraken914")]
 [assembly: AssemblyCopyright("Copyright 2026")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.0.1.0")]
+[assembly: AssemblyFileVersion("1.0.1.0")]
 
 namespace BombClient
 {
@@ -80,7 +80,7 @@ namespace BombClient
 
     internal static class AppInfo
     {
-        public const string Version = "1.0.0";
+        public const string Version = "1.0.1";
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
         public const string UpdateManifestUrl = "https://raw.githubusercontent.com/EnderKraken914/bomb-client/main/update.json";
@@ -1322,30 +1322,44 @@ namespace BombClient
                 {
                     LaunchCustomTarget(settings.CustomLaunchTarget);
                 }
+                else if (string.Equals(profile.Id, "release", StringComparison.OrdinalIgnoreCase) &&
+                    TryLaunchShellTarget(profile.FallbackUri))
+                {
+                }
+                else if (TryLaunchShellTarget("shell:AppsFolder\\" + profile.AppsFolderId))
+                {
+                }
+                else if (profile.FallbackUri.Length > 0 && TryLaunchShellTarget(profile.FallbackUri))
+                {
+                }
                 else
                 {
-                    Process.Start("explorer.exe", "shell:AppsFolder\\" + profile.AppsFolderId);
+                    throw new InvalidOperationException("Windows did not activate the app target.");
                 }
                 SetStatus(profile.Name + " launch requested.");
             }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not launch " + profile.Name + ".\n\n" + ex.Message, "Bomb Client", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private bool TryLaunchShellTarget(string target)
+        {
+            if (string.IsNullOrWhiteSpace(target))
+                return false;
+
+            try
+            {
+                ProcessStartInfo info = new ProcessStartInfo();
+                info.FileName = target;
+                info.UseShellExecute = true;
+                Process.Start(info);
+                return true;
+            }
             catch
             {
-                try
-                {
-                    if (!profile.IsCustom && profile.FallbackUri.Length > 0)
-                    {
-                        Process.Start(profile.FallbackUri);
-                        SetStatus(profile.Name + " URI launch requested.");
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Could not launch " + profile.Name + ".\n\n" + ex.Message, "Bomb Client", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
+                return false;
             }
         }
 
@@ -1357,11 +1371,12 @@ namespace BombClient
             string trimmed = target.Trim();
             if (File.Exists(trimmed) || Directory.Exists(trimmed) || trimmed.IndexOf(":", StringComparison.Ordinal) > 1)
             {
-                Process.Start(trimmed);
+                TryLaunchShellTarget(trimmed);
                 return;
             }
 
-            Process.Start("explorer.exe", trimmed);
+            if (!TryLaunchShellTarget(trimmed))
+                throw new InvalidOperationException("Windows could not open the custom launch target.");
         }
 
         private void OpenAccountTarget(string target, string successMessage)

@@ -1,6 +1,6 @@
 # Bomb Client
 
-Current version: `1.0.0`
+Current version: `1.0.1`
 
 Bomb Client is a Windows desktop launcher for Minecraft Bedrock with external PvP overlays. It launches Bedrock, draws optional click-through HUD windows above the game, and builds a visual-only Bedrock resource pack without editing the installed game.
 

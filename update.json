@@ -1,8 +1,8 @@
 {
-  "latest_version": "1.0.0",
-  "required_version": "1.0.0",
+  "latest_version": "1.0.1",
+  "required_version": "1.0.1",
   "force_update": true,
   "download_url": "https://github.com/EnderKraken914/bomb-client/releases/latest/download/BombClient-Windows.zip",
   "release_page": "https://github.com/EnderKraken914/bomb-client/releases/latest",
-  "notes": "Initial public Bomb Client build."
+  "notes": "Fixes Minecraft launch opening File Explorer by activating Bedrock directly."
 }
