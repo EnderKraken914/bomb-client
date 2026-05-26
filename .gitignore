@@ -1,0 +1,12 @@
+dist/
+build/
+*.user
+*.suo
+*.tmp
+*.log
+*.zip
+*.mcpack
+*.pdb
+*.cache
+bin/
+obj/

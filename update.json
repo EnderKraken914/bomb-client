@@ -1,0 +1,8 @@
+{
+  "latest_version": "1.0.0",
+  "required_version": "1.0.0",
+  "force_update": true,
+  "download_url": "https://github.com/EnderKraken914/bomb-client/releases/latest/download/BombClient-Windows.zip",
+  "release_page": "https://github.com/EnderKraken914/bomb-client/releases/latest",
+  "notes": "Initial public Bomb Client build."
+}
