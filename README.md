@@ -1,6 +1,6 @@
 # Bomb Client
 
-Current version: `1.0.1`
+Current version: `1.1.0`
 
 Bomb Client is a Windows desktop launcher for Minecraft Bedrock with external PvP overlays. It launches Bedrock, draws optional click-through HUD windows above the game, and builds a visual-only Bedrock resource pack without editing the installed game.
 
@@ -24,6 +24,10 @@ Open:
 - System stats
 - Server info
 - Game status
+- Armor HUD
+- Potion Effects
+- Hotbar Preview
+- Shulker Preview
 
 Each overlay has its own toggle in the Overlays tab. Turn on HUD edit mode to drag overlay windows, then turn it off to make them click-through again.
 
@@ -53,6 +57,10 @@ The Account tab opens safe Microsoft sign-in surfaces:
 
 Bomb Client does not collect, store, or handle your Microsoft password or tokens.
 
+## External Overlay Limits
+
+Bomb Client does not inject into Bedrock or read game memory. Live armor durability, potion effects, hotbar contents, and shulker NBT contents are not exposed to external Windows apps by Minecraft Bedrock. The matching overlay modules are configurable HUD shells for layout, while real inventory/NBT population would require a server/add-on data bridge or game hooking.
+
 ## Updates
 
 Bomb Client checks this repository's `update.json` on startup:
@@ -70,4 +78,6 @@ To force an update:
 
 ## Visual pack
 
-The Visual Pack tab can build/import `BombClientPvPPack.mcpack` with low fire, no bobber, clean pumpkin, and clear vignette options. The pack is generated under `%APPDATA%\BombClient\GeneratedPacks`.
+The Visual Pack tab can build/import `BombClientPvPPack.mcpack` with low fire, no bobber, low shield, small totem, small totem pop, clean pumpkin, and clear vignette options. The pack is generated under `%APPDATA%\BombClient\GeneratedPacks`.
+
+Visual size sliders are included for shield, totem item, and totem pop textures.

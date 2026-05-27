@@ -19,8 +19,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("Bomb Client")]
 [assembly: AssemblyCompany("EnderKraken914")]
 [assembly: AssemblyCopyright("Copyright 2026")]
-[assembly: AssemblyVersion("1.0.1.0")]
-[assembly: AssemblyFileVersion("1.0.1.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace BombClient
 {
@@ -80,7 +80,7 @@ namespace BombClient
 
     internal static class AppInfo
     {
-        public const string Version = "1.0.1";
+        public const string Version = "1.1.0";
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
         public const string UpdateManifestUrl = "https://raw.githubusercontent.com/EnderKraken914/bomb-client/main/update.json";
@@ -306,10 +306,17 @@ namespace BombClient
         public string LaunchProfile = "release";
         public string CustomLaunchTarget = "";
         public int OverlayOpacity = 92;
+        public int OverlayScale = 100;
         public bool EditMode = false;
         public bool OnlyShowInWorld = true;
         public bool VisualLowFire = true;
         public bool VisualNoBobber = true;
+        public bool VisualLowShield = true;
+        public bool VisualSmallTotem = true;
+        public bool VisualSmallTotemPop = true;
+        public int VisualShieldSize = 58;
+        public int VisualTotemSize = 62;
+        public int VisualTotemPopSize = 48;
         public bool VisualCleanPumpkin = true;
         public bool VisualClearVignette = true;
 
@@ -372,6 +379,12 @@ namespace BombClient
                     if (int.TryParse(value, out opacity))
                         settings.OverlayOpacity = Math.Max(40, Math.Min(100, opacity));
                 }
+                else if (key.Equals("overlay.scale", StringComparison.OrdinalIgnoreCase))
+                {
+                    int scale;
+                    if (int.TryParse(value, out scale))
+                        settings.OverlayScale = Math.Max(60, Math.Min(180, scale));
+                }
                 else if (key.Equals("edit.mode", StringComparison.OrdinalIgnoreCase))
                 {
                     settings.EditMode = ParseBool(value, false);
@@ -387,6 +400,36 @@ namespace BombClient
                 else if (key.Equals("visual.noBobber", StringComparison.OrdinalIgnoreCase))
                 {
                     settings.VisualNoBobber = ParseBool(value, true);
+                }
+                else if (key.Equals("visual.lowShield", StringComparison.OrdinalIgnoreCase))
+                {
+                    settings.VisualLowShield = ParseBool(value, true);
+                }
+                else if (key.Equals("visual.smallTotem", StringComparison.OrdinalIgnoreCase))
+                {
+                    settings.VisualSmallTotem = ParseBool(value, true);
+                }
+                else if (key.Equals("visual.smallTotemPop", StringComparison.OrdinalIgnoreCase))
+                {
+                    settings.VisualSmallTotemPop = ParseBool(value, true);
+                }
+                else if (key.Equals("visual.shieldSize", StringComparison.OrdinalIgnoreCase))
+                {
+                    int size;
+                    if (int.TryParse(value, out size))
+                        settings.VisualShieldSize = Math.Max(20, Math.Min(100, size));
+                }
+                else if (key.Equals("visual.totemSize", StringComparison.OrdinalIgnoreCase))
+                {
+                    int size;
+                    if (int.TryParse(value, out size))
+                        settings.VisualTotemSize = Math.Max(20, Math.Min(100, size));
+                }
+                else if (key.Equals("visual.totemPopSize", StringComparison.OrdinalIgnoreCase))
+                {
+                    int size;
+                    if (int.TryParse(value, out size))
+                        settings.VisualTotemPopSize = Math.Max(20, Math.Min(100, size));
                 }
                 else if (key.Equals("visual.cleanPumpkin", StringComparison.OrdinalIgnoreCase))
                 {
@@ -425,10 +468,17 @@ namespace BombClient
             lines.Add("launch.profile=" + LaunchProfile);
             lines.Add("launch.customTarget=" + CustomLaunchTarget);
             lines.Add("overlay.opacity=" + OverlayOpacity.ToString());
+            lines.Add("overlay.scale=" + OverlayScale.ToString());
             lines.Add("edit.mode=" + EditMode.ToString());
             lines.Add("overlay.onlyShowInWorld=" + OnlyShowInWorld.ToString());
             lines.Add("visual.lowFire=" + VisualLowFire.ToString());
             lines.Add("visual.noBobber=" + VisualNoBobber.ToString());
+            lines.Add("visual.lowShield=" + VisualLowShield.ToString());
+            lines.Add("visual.smallTotem=" + VisualSmallTotem.ToString());
+            lines.Add("visual.smallTotemPop=" + VisualSmallTotemPop.ToString());
+            lines.Add("visual.shieldSize=" + VisualShieldSize.ToString());
+            lines.Add("visual.totemSize=" + VisualTotemSize.ToString());
+            lines.Add("visual.totemPopSize=" + VisualTotemPopSize.ToString());
             lines.Add("visual.cleanPumpkin=" + VisualCleanPumpkin.ToString());
             lines.Add("visual.clearVignette=" + VisualClearVignette.ToString());
 
@@ -562,9 +612,20 @@ namespace BombClient
         private NumericUpDown serverPortBox;
         private TrackBar opacityTrack;
         private Label opacityLabel;
+        private TrackBar overlayScaleTrack;
+        private Label overlayScaleLabel;
         private CheckBox gameplayOnlyCheck;
         private CheckBox lowFireCheck;
         private CheckBox noBobberCheck;
+        private CheckBox lowShieldCheck;
+        private CheckBox smallTotemCheck;
+        private CheckBox smallTotemPopCheck;
+        private TrackBar shieldSizeTrack;
+        private TrackBar totemSizeTrack;
+        private TrackBar totemPopSizeTrack;
+        private Label shieldSizeLabel;
+        private Label totemSizeLabel;
+        private Label totemPopSizeLabel;
         private CheckBox cleanPumpkinCheck;
         private CheckBox clearVignetteCheck;
         private Timer statusTimer;
@@ -1065,11 +1126,12 @@ namespace BombClient
         private Panel BuildVisualPage()
         {
             Panel page = CreatePage();
+            page.AutoScroll = true;
             Label heading = CreateHeading("Visual Pack");
             heading.Location = new Point(0, 0);
             page.Controls.Add(heading);
 
-            Panel card = CreateCard(0, 54, 620, 330);
+            Panel card = CreateCard(0, 54, 720, 560);
             page.Controls.Add(card);
             Label title = CreateCardTitle("Bomb Client PvP Pack");
             title.Location = new Point(20, 18);
@@ -1083,28 +1145,83 @@ namespace BombClient
             noBobberCheck.Location = new Point(22, 102);
             card.Controls.Add(noBobberCheck);
 
+            lowShieldCheck = CreateCheck("Low shield", settings.VisualLowShield);
+            lowShieldCheck.Location = new Point(22, 142);
+            card.Controls.Add(lowShieldCheck);
+
+            smallTotemCheck = CreateCheck("Small totem", settings.VisualSmallTotem);
+            smallTotemCheck.Location = new Point(22, 182);
+            card.Controls.Add(smallTotemCheck);
+
+            smallTotemPopCheck = CreateCheck("Small totem pop", settings.VisualSmallTotemPop);
+            smallTotemPopCheck.Location = new Point(22, 222);
+            card.Controls.Add(smallTotemPopCheck);
+
             cleanPumpkinCheck = CreateCheck("Clean pumpkin", settings.VisualCleanPumpkin);
-            cleanPumpkinCheck.Location = new Point(22, 142);
+            cleanPumpkinCheck.Location = new Point(300, 62);
             card.Controls.Add(cleanPumpkinCheck);
 
             clearVignetteCheck = CreateCheck("Clear vignette", settings.VisualClearVignette);
-            clearVignetteCheck.Location = new Point(22, 182);
+            clearVignetteCheck.Location = new Point(300, 102);
             card.Controls.Add(clearVignetteCheck);
 
+            Label sizeTitle = CreateCardTitle("Visual Sizes");
+            sizeTitle.Location = new Point(20, 284);
+            card.Controls.Add(sizeTitle);
+
+            Label shieldLabel = CreateMutedLabel("Shield");
+            shieldLabel.Location = new Point(24, 318);
+            shieldLabel.Size = new Size(110, 20);
+            card.Controls.Add(shieldLabel);
+            shieldSizeTrack = CreatePercentTrack(settings.VisualShieldSize);
+            shieldSizeTrack.Location = new Point(22, 340);
+            shieldSizeTrack.Scroll += delegate { settings.VisualShieldSize = shieldSizeTrack.Value; shieldSizeLabel.Text = settings.VisualShieldSize.ToString() + "%"; };
+            card.Controls.Add(shieldSizeTrack);
+            shieldSizeLabel = CreateMutedLabel(settings.VisualShieldSize.ToString() + "%");
+            shieldSizeLabel.Location = new Point(400, 342);
+            shieldSizeLabel.Size = new Size(80, 20);
+            card.Controls.Add(shieldSizeLabel);
+
+            Label totemLabel = CreateMutedLabel("Totem item");
+            totemLabel.Location = new Point(24, 378);
+            totemLabel.Size = new Size(140, 20);
+            card.Controls.Add(totemLabel);
+            totemSizeTrack = CreatePercentTrack(settings.VisualTotemSize);
+            totemSizeTrack.Location = new Point(22, 400);
+            totemSizeTrack.Scroll += delegate { settings.VisualTotemSize = totemSizeTrack.Value; totemSizeLabel.Text = settings.VisualTotemSize.ToString() + "%"; };
+            card.Controls.Add(totemSizeTrack);
+            totemSizeLabel = CreateMutedLabel(settings.VisualTotemSize.ToString() + "%");
+            totemSizeLabel.Location = new Point(400, 402);
+            totemSizeLabel.Size = new Size(80, 20);
+            card.Controls.Add(totemSizeLabel);
+
+            Label popLabel = CreateMutedLabel("Totem pop");
+            popLabel.Location = new Point(24, 438);
+            popLabel.Size = new Size(140, 20);
+            card.Controls.Add(popLabel);
+            totemPopSizeTrack = CreatePercentTrack(settings.VisualTotemPopSize);
+            totemPopSizeTrack.Location = new Point(22, 460);
+            totemPopSizeTrack.Scroll += delegate { settings.VisualTotemPopSize = totemPopSizeTrack.Value; totemPopSizeLabel.Text = settings.VisualTotemPopSize.ToString() + "%"; };
+            card.Controls.Add(totemPopSizeTrack);
+            totemPopSizeLabel = CreateMutedLabel(settings.VisualTotemPopSize.ToString() + "%");
+            totemPopSizeLabel.Location = new Point(400, 462);
+            totemPopSizeLabel.Size = new Size(80, 20);
+            card.Controls.Add(totemPopSizeLabel);
+
             Button build = CreatePrimaryButton("Build .mcpack");
-            build.Location = new Point(22, 238);
+            build.Location = new Point(22, 504);
             build.Size = new Size(150, 42);
             build.Click += delegate { BuildPack(false); };
             card.Controls.Add(build);
 
             Button import = CreateSecondaryButton("Build and Import");
-            import.Location = new Point(190, 238);
+            import.Location = new Point(190, 504);
             import.Size = new Size(158, 42);
             import.Click += delegate { BuildPack(true); };
             card.Controls.Add(import);
 
             Button openPacks = CreateSecondaryButton("Open Pack Folder");
-            openPacks.Location = new Point(366, 238);
+            openPacks.Location = new Point(366, 504);
             openPacks.Size = new Size(150, 42);
             openPacks.Click += delegate
             {
@@ -1169,7 +1286,7 @@ namespace BombClient
             };
             serverCard.Controls.Add(saveServer);
 
-            Panel hudCard = CreateCard(0, 288, 620, 160);
+            Panel hudCard = CreateCard(0, 288, 620, 230);
             page.Controls.Add(hudCard);
             Label hudTitle = CreateCardTitle("Overlay Opacity");
             hudTitle.Location = new Point(20, 18);
@@ -1196,7 +1313,33 @@ namespace BombClient
             opacityLabel.Size = new Size(80, 24);
             hudCard.Controls.Add(opacityLabel);
 
-            Panel behaviorCard = CreateCard(0, 472, 620, 132);
+            Label scaleTitle = CreateMutedLabel("Overlay size");
+            scaleTitle.Location = new Point(22, 120);
+            scaleTitle.Size = new Size(120, 20);
+            hudCard.Controls.Add(scaleTitle);
+
+            overlayScaleTrack = new TrackBar();
+            overlayScaleTrack.Minimum = 60;
+            overlayScaleTrack.Maximum = 180;
+            overlayScaleTrack.TickFrequency = 20;
+            overlayScaleTrack.Value = settings.OverlayScale;
+            overlayScaleTrack.Location = new Point(20, 146);
+            overlayScaleTrack.Width = 360;
+            overlayScaleTrack.BackColor = panel;
+            overlayScaleTrack.Scroll += delegate
+            {
+                settings.OverlayScale = overlayScaleTrack.Value;
+                OverlayManager.SetScale(settings.OverlayScale);
+                overlayScaleLabel.Text = settings.OverlayScale.ToString() + "%";
+            };
+            hudCard.Controls.Add(overlayScaleTrack);
+
+            overlayScaleLabel = CreateMutedLabel(settings.OverlayScale.ToString() + "%");
+            overlayScaleLabel.Location = new Point(400, 153);
+            overlayScaleLabel.Size = new Size(80, 24);
+            hudCard.Controls.Add(overlayScaleLabel);
+
+            Panel behaviorCard = CreateCard(0, 542, 620, 132);
             page.Controls.Add(behaviorCard);
             Label behaviorTitle = CreateCardTitle("Overlay Behavior");
             behaviorTitle.Location = new Point(20, 18);
@@ -1290,6 +1433,8 @@ namespace BombClient
                 settings.ServerPort = (int)serverPortBox.Value;
             if (opacityTrack != null)
                 settings.OverlayOpacity = opacityTrack.Value;
+            if (overlayScaleTrack != null)
+                settings.OverlayScale = overlayScaleTrack.Value;
             if (gameplayOnlyCheck != null)
                 settings.OnlyShowInWorld = gameplayOnlyCheck.Checked;
             if (launchProfileBox != null)
@@ -1304,6 +1449,18 @@ namespace BombClient
                 settings.VisualLowFire = lowFireCheck.Checked;
             if (noBobberCheck != null)
                 settings.VisualNoBobber = noBobberCheck.Checked;
+            if (lowShieldCheck != null)
+                settings.VisualLowShield = lowShieldCheck.Checked;
+            if (smallTotemCheck != null)
+                settings.VisualSmallTotem = smallTotemCheck.Checked;
+            if (smallTotemPopCheck != null)
+                settings.VisualSmallTotemPop = smallTotemPopCheck.Checked;
+            if (shieldSizeTrack != null)
+                settings.VisualShieldSize = shieldSizeTrack.Value;
+            if (totemSizeTrack != null)
+                settings.VisualTotemSize = totemSizeTrack.Value;
+            if (totemPopSizeTrack != null)
+                settings.VisualTotemPopSize = totemPopSizeTrack.Value;
             if (cleanPumpkinCheck != null)
                 settings.VisualCleanPumpkin = cleanPumpkinCheck.Checked;
             if (clearVignetteCheck != null)
@@ -1557,6 +1714,18 @@ namespace BombClient
             return check;
         }
 
+        private TrackBar CreatePercentTrack(int value)
+        {
+            TrackBar track = new TrackBar();
+            track.Minimum = 20;
+            track.Maximum = 100;
+            track.TickFrequency = 10;
+            track.Value = Math.Max(track.Minimum, Math.Min(track.Maximum, value));
+            track.Width = 360;
+            track.BackColor = panel;
+            return track;
+        }
+
         private Button CreateToggleButton(bool enabled)
         {
             Button button = CreateBaseButton("");
@@ -1631,7 +1800,11 @@ namespace BombClient
             new OverlayDefinition("memory", "Minecraft RAM", "Memory usage for the Bedrock process when it is running.", true, 22, 462),
             new OverlayDefinition("system", "System Stats", "PC memory and CPU load readout.", false, 22, 504),
             new OverlayDefinition("server", "Server Info", "Current configured Bedrock server target.", false, 22, 546),
-            new OverlayDefinition("status", "Game Status", "Shows whether Minecraft Bedrock is running.", false, 22, 588)
+            new OverlayDefinition("status", "Game Status", "Shows whether Minecraft Bedrock is running.", false, 22, 588),
+            new OverlayDefinition("armor", "Armor HUD", "Armor-style panel with durability slots for HUD positioning.", false, 1710, 712),
+            new OverlayDefinition("potions", "Potion Effects", "Potion-style list matching the reference HUD style.", false, 22, 650),
+            new OverlayDefinition("hotbar", "Hotbar Preview", "Compact hotbar-adjacent item panel for external HUD layout.", false, 1220, 870),
+            new OverlayDefinition("shulker", "Shulker Preview", "Shift / Shift+Alt shulker preview overlay shell.", false, 800, 420)
         };
 
         public static OverlayDefinition Find(string id)
@@ -1710,6 +1883,7 @@ namespace BombClient
 
             form.EditMode = settings.EditMode;
             form.Opacity = Math.Max(0.4, Math.Min(1.0, settings.OverlayOpacity / 100.0));
+            form.SetScale(settings.OverlayScale);
             form.PositionChanged += delegate(string moduleId, Point location)
             {
                 settings.Positions[moduleId] = location;
@@ -1760,6 +1934,14 @@ namespace BombClient
                 settings.OverlayOpacity = opacity;
             foreach (BaseOverlayForm form in open.Values)
                 form.Opacity = Math.Max(0.4, Math.Min(1.0, opacity / 100.0));
+        }
+
+        public static void SetScale(int scale)
+        {
+            if (settings != null)
+                settings.OverlayScale = scale;
+            foreach (BaseOverlayForm form in open.Values)
+                form.SetScale(scale);
         }
 
         private static void EnsureVisibilityTimer()
@@ -1816,6 +1998,14 @@ namespace BombClient
                 return new TextOverlayForm(id, 230, 36, delegate { return settings.ServerHost + ":" + settings.ServerPort.ToString(); });
             if (id == "status")
                 return new TextOverlayForm(id, 176, 36, delegate { return MinecraftInfo.IsMinecraftRunning() ? "BEDROCK RUNNING" : "BEDROCK CLOSED"; });
+            if (id == "armor")
+                return new ArmorHudOverlayForm(id);
+            if (id == "potions")
+                return new PotionEffectsOverlayForm(id);
+            if (id == "hotbar")
+                return new HotbarOverlayForm(id);
+            if (id == "shulker")
+                return new ShulkerPreviewOverlayForm(id);
             return null;
         }
     }
@@ -1825,13 +2015,18 @@ namespace BombClient
         private bool editMode;
         private Point dragStart;
         private bool dragging;
+        private readonly int baseWidth;
+        private readonly int baseHeight;
         protected readonly string ModuleId;
         protected readonly Timer Timer;
+        protected int ScalePercent = 100;
         public event Action<string, Point> PositionChanged;
 
         protected BaseOverlayForm(string moduleId, int width, int height)
         {
             ModuleId = moduleId;
+            baseWidth = width;
+            baseHeight = height;
             Width = width;
             Height = height;
             StartPosition = FormStartPosition.Manual;
@@ -1873,6 +2068,24 @@ namespace BombClient
                 if (PositionChanged != null)
                     PositionChanged(ModuleId, Location);
             };
+        }
+
+        public virtual void SetScale(int percent)
+        {
+            ScalePercent = Math.Max(60, Math.Min(180, percent));
+            Width = S(baseWidth);
+            Height = S(baseHeight);
+            Invalidate();
+        }
+
+        protected int S(int value)
+        {
+            return Math.Max(1, (int)Math.Round(value * (ScalePercent / 100.0)));
+        }
+
+        protected float SF(float value)
+        {
+            return (float)(value * (ScalePercent / 100.0));
         }
 
         protected override CreateParams CreateParams
@@ -1948,7 +2161,6 @@ namespace BombClient
     {
         private readonly Func<string> provider;
         private readonly bool trackFrames;
-        private readonly Font font = new Font("Segoe UI Semibold", 10.5f, FontStyle.Bold);
 
         public TextOverlayForm(string moduleId, int width, int height, Func<string> textProvider)
             : this(moduleId, width, height, textProvider, false)
@@ -1970,7 +2182,8 @@ namespace BombClient
                 FrameCounter.Tick();
             DrawOverlayBack(e.Graphics, ClientRectangle);
             string value = provider();
-            TextRenderer.DrawText(e.Graphics, value, font, new Rectangle(10, 7, Width - 20, Height - 12), Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+            using (Font font = new Font("Segoe UI Semibold", SF(10.5f), FontStyle.Bold))
+                TextRenderer.DrawText(e.Graphics, value, font, new Rectangle(S(10), S(7), Width - S(20), Height - S(12)), Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
             base.OnPaint(e);
         }
     }
@@ -1978,7 +2191,6 @@ namespace BombClient
     internal sealed class PingOverlayForm : BaseOverlayForm
     {
         private readonly AppSettings settings;
-        private readonly Font font = new Font("Segoe UI Semibold", 10.5f, FontStyle.Bold);
         private string current = "PING ...";
         private DateTime lastPing = DateTime.MinValue;
         private bool active;
@@ -1993,7 +2205,8 @@ namespace BombClient
         protected override void OnPaint(PaintEventArgs e)
         {
             DrawOverlayBack(e.Graphics, ClientRectangle);
-            TextRenderer.DrawText(e.Graphics, current, font, new Rectangle(10, 7, Width - 20, Height - 12), Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+            using (Font font = new Font("Segoe UI Semibold", SF(10.5f), FontStyle.Bold))
+                TextRenderer.DrawText(e.Graphics, current, font, new Rectangle(S(10), S(7), Width - S(20), Height - S(12)), Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
             if ((DateTime.UtcNow - lastPing).TotalSeconds > 2 && !active)
                 BeginPing();
             base.OnPaint(e);
@@ -2025,9 +2238,6 @@ namespace BombClient
 
     internal sealed class KeystrokesOverlayForm : BaseOverlayForm
     {
-        private readonly Font keyFont = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
-        private readonly Font smallFont = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold);
-
         public KeystrokesOverlayForm(string moduleId)
             : base(moduleId, 164, 164)
         {
@@ -2050,17 +2260,19 @@ namespace BombClient
         private void DrawKey(Graphics g, string label, Keys key, int x, int y, int w, int h)
         {
             bool down = InputTracker.IsDown(key);
-            DrawKeyBox(g, label, down, x, y, w, h, label.Length > 1 ? smallFont : keyFont);
+            using (Font font = new Font("Segoe UI Semibold", label.Length > 1 ? 8.5f : 10f, FontStyle.Bold))
+                DrawKeyBox(g, label, down, x, y, w, h, font);
         }
 
         private void DrawMouse(Graphics g, string label, bool down, int x, int y, int w, int h)
         {
-            DrawKeyBox(g, label, down, x, y, w, h, smallFont);
+            using (Font font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold))
+                DrawKeyBox(g, label, down, x, y, w, h, font);
         }
 
         private void DrawKeyBox(Graphics g, string label, bool down, int x, int y, int w, int h, Font font)
         {
-            Rectangle rect = new Rectangle(x, y, w, h);
+            Rectangle rect = new Rectangle(S(x), S(y), S(w), S(h));
             using (GraphicsPath path = RoundedRect(rect, 6))
             using (SolidBrush brush = new SolidBrush(down ? Color.FromArgb(255, 164, 58) : Color.FromArgb(37, 44, 58)))
             using (Pen pen = new Pen(down ? Color.FromArgb(255, 203, 104) : Color.FromArgb(64, 75, 94)))
@@ -2068,7 +2280,8 @@ namespace BombClient
                 g.FillPath(brush, path);
                 g.DrawPath(pen, path);
             }
-            TextRenderer.DrawText(g, label, font, rect, down ? Color.FromArgb(20, 20, 24) : Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            using (Font scaled = new Font(font.FontFamily, SF(font.Size), font.Style))
+                TextRenderer.DrawText(g, label, scaled, rect, down ? Color.FromArgb(20, 20, 24) : Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }
     }
 
@@ -2078,6 +2291,13 @@ namespace BombClient
             : base(moduleId, Screen.PrimaryScreen.Bounds.Width, Screen.PrimaryScreen.Bounds.Height)
         {
             TopMost = true;
+        }
+
+        public override void SetScale(int percent)
+        {
+            ScalePercent = Math.Max(60, Math.Min(180, percent));
+            Bounds = Screen.PrimaryScreen.Bounds;
+            Invalidate();
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -2098,6 +2318,168 @@ namespace BombClient
                 e.Graphics.DrawLine(hot, cx, cy + 4, cx, cy + 12);
             }
             base.OnPaint(e);
+        }
+    }
+
+    internal sealed class ArmorHudOverlayForm : BaseOverlayForm
+    {
+        public ArmorHudOverlayForm(string moduleId)
+            : base(moduleId, 94, 246)
+        {
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            DrawOverlayBack(e.Graphics, ClientRectangle);
+            string[] names = new string[] { "H", "C", "L", "B" };
+            for (int i = 0; i < names.Length; i++)
+                DrawArmorSlot(e.Graphics, names[i], i, 6 + (i * 56));
+
+            using (Font font = new Font("Segoe UI Semibold", SF(7.5f), FontStyle.Bold))
+                TextRenderer.DrawText(e.Graphics, "external", font, new Rectangle(S(12), S(226), S(70), S(16)), Color.FromArgb(152, 163, 180), TextFormatFlags.HorizontalCenter);
+            base.OnPaint(e);
+        }
+
+        private void DrawArmorSlot(Graphics g, string label, int index, int y)
+        {
+            Rectangle rect = new Rectangle(S(12), S(y), S(70), S(48));
+            using (GraphicsPath path = RoundedRect(rect, S(10)))
+            using (SolidBrush brush = new SolidBrush(Color.FromArgb(38, 30, 58)))
+            using (Pen pen = new Pen(Color.FromArgb(105, 76, 160)))
+            {
+                g.FillPath(brush, path);
+                g.DrawPath(pen, path);
+            }
+
+            using (Font icon = new Font("Segoe UI Semibold", SF(13f), FontStyle.Bold))
+                TextRenderer.DrawText(g, label, icon, rect, Color.FromArgb(165, 120, 255), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+
+            int durability = 100 - (index * 13);
+            Rectangle bar = new Rectangle(S(18), S(y + 38), S(58), S(5));
+            using (SolidBrush back = new SolidBrush(Color.FromArgb(17, 22, 30)))
+                g.FillRectangle(back, bar);
+            using (SolidBrush fill = new SolidBrush(Color.FromArgb(51, 222, 137)))
+                g.FillRectangle(fill, new Rectangle(bar.X, bar.Y, (int)(bar.Width * (durability / 100.0)), bar.Height));
+        }
+    }
+
+    internal sealed class PotionEffectsOverlayForm : BaseOverlayForm
+    {
+        public PotionEffectsOverlayForm(string moduleId)
+            : base(moduleId, 252, 154)
+        {
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            DrawOverlayBack(e.Graphics, ClientRectangle);
+            using (Font effectFont = new Font("Segoe UI Semibold", SF(15f), FontStyle.Bold))
+            using (Font timeFont = new Font("Segoe UI", SF(10f), FontStyle.Bold))
+            {
+                DrawEffect(e.Graphics, effectFont, timeFont, 14, "Strength II", "00:00");
+                DrawEffect(e.Graphics, effectFont, timeFont, 58, "Fire Resistance I", "00:00");
+                DrawEffect(e.Graphics, effectFont, timeFont, 102, "Speed II", "00:01");
+            }
+            base.OnPaint(e);
+        }
+
+        private void DrawEffect(Graphics g, Font effectFont, Font timeFont, int y, string name, string time)
+        {
+            TextRenderer.DrawText(g, name, effectFont, new Rectangle(S(14), S(y), S(224), S(28)), Color.White, TextFormatFlags.Left);
+            TextRenderer.DrawText(g, time, timeFont, new Rectangle(S(14), S(y + 26), S(120), S(20)), Color.White, TextFormatFlags.Left);
+        }
+    }
+
+    internal sealed class HotbarOverlayForm : BaseOverlayForm
+    {
+        public HotbarOverlayForm(string moduleId)
+            : base(moduleId, 292, 48)
+        {
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            DrawOverlayBack(e.Graphics, ClientRectangle);
+            for (int i = 0; i < 9; i++)
+                DrawSlot(e.Graphics, i);
+            base.OnPaint(e);
+        }
+
+        private void DrawSlot(Graphics g, int index)
+        {
+            int x = 8 + (index * 31);
+            Rectangle rect = new Rectangle(S(x), S(8), S(28), S(32));
+            using (SolidBrush brush = new SolidBrush(index == 0 ? Color.FromArgb(70, 88, 112) : Color.FromArgb(31, 38, 50)))
+            using (Pen pen = new Pen(Color.FromArgb(72, 83, 104)))
+            {
+                g.FillRectangle(brush, rect);
+                g.DrawRectangle(pen, rect);
+            }
+
+            string label = index == 0 ? "T" : (index + 1).ToString();
+            using (Font font = new Font("Segoe UI Semibold", SF(9f), FontStyle.Bold))
+                TextRenderer.DrawText(g, label, font, rect, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        }
+    }
+
+    internal sealed class ShulkerPreviewOverlayForm : BaseOverlayForm
+    {
+        public ShulkerPreviewOverlayForm(string moduleId)
+            : base(moduleId, 384, 232)
+        {
+            Timer.Interval = 80;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            bool shift = InputTracker.IsDown(Keys.ShiftKey) || InputTracker.IsDown(Keys.LShiftKey) || InputTracker.IsDown(Keys.RShiftKey);
+            bool alt = InputTracker.IsDown(Keys.Menu) || InputTracker.IsDown(Keys.LMenu) || InputTracker.IsDown(Keys.RMenu);
+
+            if (!shift)
+            {
+                DrawOverlayBack(e.Graphics, new Rectangle(0, 0, S(244), S(44)));
+                using (Font font = new Font("Segoe UI Semibold", SF(9f), FontStyle.Bold))
+                    TextRenderer.DrawText(e.Graphics, "Hold LShift over shulker", font, new Rectangle(S(12), S(10), S(220), S(24)), Color.White, TextFormatFlags.Left);
+                base.OnPaint(e);
+                return;
+            }
+
+            DrawOverlayBack(e.Graphics, ClientRectangle);
+            string title = alt ? "Shulker Contents" : "Shulker Counts";
+            using (Font titleFont = new Font("Segoe UI Semibold", SF(13f), FontStyle.Bold))
+            using (Font noteFont = new Font("Segoe UI", SF(8.5f), FontStyle.Bold))
+            {
+                TextRenderer.DrawText(e.Graphics, title, titleFont, new Rectangle(S(14), S(10), S(250), S(28)), Color.White, TextFormatFlags.Left);
+                DrawGrid(e.Graphics, alt);
+                TextRenderer.DrawText(e.Graphics, "External mode: Bedrock item NBT is not exposed to Bomb Client.", noteFont, new Rectangle(S(14), S(194), S(354), S(26)), Color.FromArgb(255, 179, 70), TextFormatFlags.Left);
+            }
+            base.OnPaint(e);
+        }
+
+        private void DrawGrid(Graphics g, bool full)
+        {
+            Color boxColor = full ? Color.FromArgb(210, 28, 208, 217) : Color.FromArgb(210, 126, 40, 210);
+            using (SolidBrush outer = new SolidBrush(boxColor))
+                g.FillRectangle(outer, new Rectangle(S(16), S(44), S(352), S(132)));
+
+            for (int row = 0; row < 3; row++)
+            {
+                for (int col = 0; col < 9; col++)
+                {
+                    Rectangle cell = new Rectangle(S(24 + (col * 38)), S(54 + (row * 38)), S(34), S(34));
+                    using (SolidBrush brush = new SolidBrush(Color.FromArgb(42, 22, 48)))
+                    using (Pen pen = new Pen(Color.FromArgb(15, 15, 20)))
+                    {
+                        g.FillRectangle(brush, cell);
+                        g.DrawRectangle(pen, cell);
+                    }
+                    if (full && (row + col) % 2 == 0)
+                    {
+                        using (Font font = new Font("Segoe UI Semibold", SF(8f), FontStyle.Bold))
+                            TextRenderer.DrawText(g, "64", font, cell, Color.White, TextFormatFlags.Right | TextFormatFlags.Bottom);
+                    }
+                }
+            }
         }
     }
 
@@ -2196,12 +2578,16 @@ namespace BombClient
                         keyDown[vkCode] = true;
                         if (vkCode == (int)Keys.ShiftKey || vkCode == (int)Keys.LShiftKey || vkCode == (int)Keys.RShiftKey)
                             keyDown[(int)Keys.ShiftKey] = true;
+                        if (vkCode == (int)Keys.Menu || vkCode == (int)Keys.LMenu || vkCode == (int)Keys.RMenu)
+                            keyDown[(int)Keys.Menu] = true;
                     }
                     else if (msg == NativeMethods.WM_KEYUP || msg == NativeMethods.WM_SYSKEYUP)
                     {
                         keyDown[vkCode] = false;
                         if (vkCode == (int)Keys.ShiftKey || vkCode == (int)Keys.LShiftKey || vkCode == (int)Keys.RShiftKey)
                             keyDown[(int)Keys.ShiftKey] = false;
+                        if (vkCode == (int)Keys.Menu || vkCode == (int)Keys.LMenu || vkCode == (int)Keys.RMenu)
+                            keyDown[(int)Keys.Menu] = false;
                     }
                 }
             }
@@ -2521,9 +2907,13 @@ namespace BombClient
             Directory.CreateDirectory(working);
             Directory.CreateDirectory(Path.Combine(working, "textures", "blocks"));
             Directory.CreateDirectory(Path.Combine(working, "textures", "entity"));
+            Directory.CreateDirectory(Path.Combine(working, "textures", "items"));
             Directory.CreateDirectory(Path.Combine(working, "textures", "misc"));
+            Directory.CreateDirectory(Path.Combine(working, "textures", "particle"));
+            Directory.CreateDirectory(Path.Combine(working, "particles"));
 
             File.WriteAllText(Path.Combine(working, "manifest.json"), BuildManifest(), Encoding.UTF8);
+            File.WriteAllText(Path.Combine(working, "textures", "item_texture.json"), BuildItemTextureJson(), Encoding.UTF8);
             SavePackIcon(Path.Combine(working, "pack_icon.png"));
 
             if (settings.VisualLowFire)
@@ -2534,6 +2924,12 @@ namespace BombClient
                     Path.Combine("textures", "entity", "fishing_hook.png"),
                     Path.Combine("textures", "entity", "fishing_hook_marker.png")
                 }, 32, 32);
+            if (settings.VisualLowShield)
+                WriteLowShieldTextures(working, settings.VisualShieldSize);
+            if (settings.VisualSmallTotem)
+                WriteSmallTotemTexture(working, settings.VisualTotemSize);
+            if (settings.VisualSmallTotemPop)
+                WriteSmallTotemPop(working, settings.VisualTotemPopSize);
             if (settings.VisualCleanPumpkin)
                 WriteTransparentTextures(working, new string[] { Path.Combine("textures", "misc", "pumpkinblur.png") }, 256, 256);
             if (settings.VisualClearVignette)
@@ -2564,6 +2960,21 @@ namespace BombClient
             sb.AppendLine("      \"version\": [1, 0, 0]");
             sb.AppendLine("    }");
             sb.AppendLine("  ]");
+            sb.AppendLine("}");
+            return sb.ToString();
+        }
+
+        private static string BuildItemTextureJson()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("{");
+            sb.AppendLine("  \"resource_pack_name\": \"bomb_client_pvp_pack\",");
+            sb.AppendLine("  \"texture_name\": \"atlas.items\",");
+            sb.AppendLine("  \"texture_data\": {");
+            sb.AppendLine("    \"totem\": { \"textures\": \"textures/items/totem\" },");
+            sb.AppendLine("    \"totem_of_undying\": { \"textures\": \"textures/items/totem\" },");
+            sb.AppendLine("    \"shield\": { \"textures\": \"textures/items/shield\" }");
+            sb.AppendLine("  }");
             sb.AppendLine("}");
             return sb.ToString();
         }
@@ -2614,6 +3025,113 @@ namespace BombClient
                     g.FillPolygon(b, new Point[] { new Point(3, 15), new Point(6, 11), new Point(8, 15), new Point(10, 11), new Point(13, 15) });
                 using (SolidBrush b = new SolidBrush(c3))
                     g.FillPolygon(b, new Point[] { new Point(6, 15), new Point(8, 12), new Point(10, 15) });
+            }
+            return bmp;
+        }
+
+        private static void WriteLowShieldTextures(string working, int sizePercent)
+        {
+            using (Bitmap shield = CreateShieldTexture(sizePercent))
+            {
+                shield.Save(Path.Combine(working, "textures", "items", "shield.png"), System.Drawing.Imaging.ImageFormat.Png);
+                shield.Save(Path.Combine(working, "textures", "entity", "shield.png"), System.Drawing.Imaging.ImageFormat.Png);
+                shield.Save(Path.Combine(working, "textures", "entity", "shield_base_nopattern.png"), System.Drawing.Imaging.ImageFormat.Png);
+            }
+        }
+
+        private static Bitmap CreateShieldTexture(int sizePercent)
+        {
+            int canvas = 64;
+            Bitmap bmp = new Bitmap(canvas, canvas);
+            int shieldW = Math.Max(12, canvas * Math.Max(20, Math.Min(100, sizePercent)) / 100);
+            int shieldH = Math.Max(16, (int)(shieldW * 1.18));
+            int x = (canvas - shieldW) / 2;
+            int y = Math.Min(canvas - shieldH - 1, canvas - shieldH / 2 - 4);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.Transparent);
+                g.SmoothingMode = SmoothingMode.None;
+                Point[] shape = new Point[]
+                {
+                    new Point(x + shieldW / 2, y),
+                    new Point(x + shieldW - 2, y + shieldH / 5),
+                    new Point(x + shieldW - 6, y + shieldH - 8),
+                    new Point(x + shieldW / 2, y + shieldH - 1),
+                    new Point(x + 5, y + shieldH - 8),
+                    new Point(x + 2, y + shieldH / 5)
+                };
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(230, 92, 62, 42)))
+                    g.FillPolygon(b, shape);
+                using (Pen edge = new Pen(Color.FromArgb(255, 42, 31, 24), Math.Max(1, shieldW / 14)))
+                    g.DrawPolygon(edge, shape);
+                using (SolidBrush stripe = new SolidBrush(Color.FromArgb(230, 190, 160, 108)))
+                    g.FillRectangle(stripe, x + shieldW / 2 - Math.Max(1, shieldW / 12), y + shieldH / 6, Math.Max(2, shieldW / 6), shieldH - shieldH / 4);
+            }
+            return bmp;
+        }
+
+        private static void WriteSmallTotemTexture(string working, int sizePercent)
+        {
+            using (Bitmap totem = CreateTotemTexture(sizePercent, false))
+                totem.Save(Path.Combine(working, "textures", "items", "totem.png"), System.Drawing.Imaging.ImageFormat.Png);
+        }
+
+        private static void WriteSmallTotemPop(string working, int sizePercent)
+        {
+            using (Bitmap particle = CreateTotemTexture(sizePercent, true))
+            {
+                particle.Save(Path.Combine(working, "textures", "particle", "totem_particle.png"), System.Drawing.Imaging.ImageFormat.Png);
+                particle.Save(Path.Combine(working, "textures", "particle", "totem.png"), System.Drawing.Imaging.ImageFormat.Png);
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("{");
+            sb.AppendLine("  \"format_version\": \"1.10.0\",");
+            sb.AppendLine("  \"particle_effect\": {");
+            sb.AppendLine("    \"description\": {");
+            sb.AppendLine("      \"identifier\": \"minecraft:totem_particle\",");
+            sb.AppendLine("      \"basic_render_parameters\": {");
+            sb.AppendLine("        \"material\": \"particles_alpha\",");
+            sb.AppendLine("        \"texture\": \"textures/particle/totem_particle\"");
+            sb.AppendLine("      }");
+            sb.AppendLine("    }");
+            sb.AppendLine("  }");
+            sb.AppendLine("}");
+            File.WriteAllText(Path.Combine(working, "particles", "totem_particle.json"), sb.ToString(), Encoding.UTF8);
+        }
+
+        private static Bitmap CreateTotemTexture(int sizePercent, bool pop)
+        {
+            int canvas = pop ? 128 : 64;
+            Bitmap bmp = new Bitmap(canvas, canvas);
+            int size = Math.Max(canvas / 5, canvas * Math.Max(20, Math.Min(100, sizePercent)) / 100);
+            int x = (canvas - size) / 2;
+            int y = (canvas - size) / 2 + (pop ? canvas / 8 : 0);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.Transparent);
+                g.SmoothingMode = SmoothingMode.None;
+                Color gold = Color.FromArgb(245, 226, 83);
+                Color green = Color.FromArgb(74, 190, 111);
+                Color dark = Color.FromArgb(84, 110, 46);
+                using (SolidBrush b = new SolidBrush(gold))
+                {
+                    g.FillRectangle(b, x + size / 3, y, size / 3, size / 4);
+                    g.FillRectangle(b, x + size / 4, y + size / 4, size / 2, size / 3);
+                    g.FillRectangle(b, x + size / 3, y + size / 2, size / 3, size / 2);
+                }
+                using (SolidBrush b = new SolidBrush(green))
+                {
+                    g.FillRectangle(b, x + size / 6, y + size / 4, size / 5, size / 3);
+                    g.FillRectangle(b, x + size - size / 3, y + size / 4, size / 5, size / 3);
+                    g.FillRectangle(b, x + size / 3, y + size - size / 6, size / 7, size / 6);
+                    g.FillRectangle(b, x + size / 2, y + size - size / 6, size / 7, size / 6);
+                }
+                using (SolidBrush b = new SolidBrush(dark))
+                {
+                    g.FillRectangle(b, x + size / 3, y + size / 9, size / 12, size / 12);
+                    g.FillRectangle(b, x + size / 2 + size / 12, y + size / 9, size / 12, size / 12);
+                }
             }
             return bmp;
         }
