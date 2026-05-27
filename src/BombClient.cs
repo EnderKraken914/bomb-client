@@ -84,7 +84,7 @@ namespace BombClient
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
         public const string UpdateManifestUrl = "https://raw.githubusercontent.com/EnderKraken914/bomb-client/main/update.json";
-        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/latest/download/BombClient-Windows.zip";
+        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/raw/main/release/BombClient-Windows.zip";
     }
 
     internal sealed class UpdateManifest

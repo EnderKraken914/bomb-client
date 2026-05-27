@@ -67,14 +67,14 @@ Bomb Client checks this repository's `update.json` on startup:
 
 `https://raw.githubusercontent.com/EnderKraken914/bomb-client/main/update.json`
 
-When `required_version` is higher than the installed app version and `force_update` is `true`, players must update before the launcher opens. The app downloads `BombClient-Windows.zip` from the latest GitHub release and replaces the AppData build.
+When `required_version` is higher than the installed app version and `force_update` is `true`, players must update before the launcher opens. The app downloads `release/BombClient-Windows.zip` from this repository and replaces the AppData build.
 
 To force an update:
 
 1. Build a new `BombClient-Windows.zip`.
-2. Publish it as a GitHub release asset.
+2. Replace `release/BombClient-Windows.zip`.
 3. Update `update.json` with the new `latest_version` and `required_version`.
-4. Commit and push `update.json`.
+4. Commit and push the updated files.
 
 ## Visual pack
 
