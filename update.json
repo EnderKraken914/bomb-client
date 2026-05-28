@@ -1,8 +1,8 @@
 {
-  "latest_version": "1.1.4",
-  "required_version": "1.1.4",
+  "latest_version": "1.1.5",
+  "required_version": "1.1.5",
   "force_update": true,
-  "download_url": "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.4/BombClient-Windows-1.1.4.zip",
-  "release_page": "https://github.com/EnderKraken914/bomb-client/releases/tag/v1.1.4",
-  "notes": "Replaces Open Minecraft Sign-In with official Microsoft device-code authentication and account display fields."
+  "download_url": "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.5/BombClient-Windows-1.1.5.zip",
+  "release_page": "https://github.com/EnderKraken914/bomb-client/releases/tag/v1.1.5",
+  "notes": "Rebuilds the launcher UI with a Feather-style dark layout, top navigation, profile button, settings button, and custom window controls."
 }

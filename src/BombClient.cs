@@ -19,8 +19,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("Bomb Client")]
 [assembly: AssemblyCompany("EnderKraken914")]
 [assembly: AssemblyCopyright("Copyright 2026")]
-[assembly: AssemblyVersion("1.1.4.0")]
-[assembly: AssemblyFileVersion("1.1.4.0")]
+[assembly: AssemblyVersion("1.1.5.0")]
+[assembly: AssemblyFileVersion("1.1.5.0")]
 
 namespace BombClient
 {
@@ -79,11 +79,11 @@ namespace BombClient
 
     internal static class AppInfo
     {
-        public const string Version = "1.1.4";
+        public const string Version = "1.1.5";
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
         public const string UpdateManifestUrl = "https://api.github.com/repos/EnderKraken914/bomb-client/contents/update.json?ref=main";
-        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.4/BombClient-Windows-1.1.4.zip";
+        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.5/BombClient-Windows-1.1.5.zip";
     }
 
     internal sealed class UpdateManifest
@@ -810,6 +810,8 @@ namespace BombClient
         private Label accountEmailLabel;
         private Label accountSignedInLabel;
         private Button microsoftSignInButton;
+        private Button accountPillButton;
+        private readonly Dictionary<string, Button> pageButtons = new Dictionary<string, Button>(StringComparer.OrdinalIgnoreCase);
         private TextBox serverHostBox;
         private NumericUpDown serverPortBox;
         private TrackBar opacityTrack;
@@ -850,99 +852,116 @@ namespace BombClient
             Text = "Bomb Client";
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(980, 640);
-            Size = new Size(1060, 690);
+            AutoScaleMode = AutoScaleMode.None;
+            FormBorderStyle = FormBorderStyle.None;
+            MinimumSize = new Size(1180, 680);
+            Size = new Size(1180, 700);
             BackColor = bg;
             Font = uiFont;
 
-            TableLayoutPanel shell = new TableLayoutPanel();
+            Panel shell = new Panel();
             shell.Dock = DockStyle.Fill;
-            shell.ColumnCount = 2;
-            shell.RowCount = 2;
-            shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 198f));
-            shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 98f));
-            shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
             shell.BackColor = bg;
             Controls.Add(shell);
 
-            Panel header = new Panel();
-            header.Dock = DockStyle.Fill;
-            header.BackColor = Color.FromArgb(12, 16, 24);
-            header.Padding = new Padding(24, 14, 24, 14);
-            shell.SetColumnSpan(header, 2);
-            shell.Controls.Add(header, 0, 0);
+            Panel topBar = new Panel();
+            topBar.Dock = DockStyle.Top;
+            topBar.Height = 88;
+            topBar.BackColor = Color.FromArgb(5, 8, 12);
+            topBar.MouseDown += DragWindow;
+            shell.Controls.Add(topBar);
 
             PictureBox logo = new PictureBox();
             logo.Image = AssetLoader.LoadLogo();
-            logo.BackColor = header.BackColor;
+            logo.BackColor = topBar.BackColor;
             logo.SizeMode = PictureBoxSizeMode.Zoom;
-            logo.Location = new Point(22, 12);
-            logo.Size = new Size(72, 72);
-            header.Controls.Add(logo);
+            logo.Location = new Point(28, 26);
+            logo.Size = new Size(44, 44);
+            logo.MouseDown += DragWindow;
+            topBar.Controls.Add(logo);
 
             Label title = new Label();
-            title.Text = "Bomb Client";
+            title.Text = "BOMB CLIENT";
             title.AutoSize = true;
             title.ForeColor = text;
-            title.Font = titleFont;
-            title.Location = new Point(105, 16);
-            header.Controls.Add(title);
+            title.Font = new Font("Segoe UI Semibold", 14f, FontStyle.Bold);
+            title.Location = new Point(82, 34);
+            title.MouseDown += DragWindow;
+            topBar.Controls.Add(title);
 
-            Label subtitle = new Label();
-            subtitle.Text = "Bedrock launcher and external PvP overlays";
-            subtitle.AutoSize = true;
-            subtitle.ForeColor = muted;
-            subtitle.Location = new Point(110, 58);
-            header.Controls.Add(subtitle);
+            Panel navStrip = new Panel();
+            navStrip.Size = new Size(420, 48);
+            navStrip.BackColor = Color.FromArgb(13, 18, 22);
+            navStrip.Location = new Point(420, 20);
+            topBar.Controls.Add(navStrip);
 
-            Button launch = CreatePrimaryButton("Launch Minecraft");
-            launch.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            launch.Size = new Size(178, 42);
-            launch.Location = new Point(header.Width - 202, 28);
-            launch.Click += delegate { LaunchMinecraft(); };
-            header.Resize += delegate { launch.Location = new Point(header.Width - 202, 28); };
-            header.Controls.Add(launch);
+            Button navPlay = CreateTopNavButton("Play");
+            Button navMods = CreateTopNavButton("Mods");
+            Button navVisuals = CreateTopNavButton("Visuals");
+            Button navServers = CreateTopNavButton("Servers");
+            navPlay.Location = new Point(10, 7);
+            navMods.Location = new Point(112, 7);
+            navVisuals.Location = new Point(214, 7);
+            navServers.Location = new Point(316, 7);
+            navStrip.Controls.Add(navPlay);
+            navStrip.Controls.Add(navMods);
+            navStrip.Controls.Add(navVisuals);
+            navStrip.Controls.Add(navServers);
+            RegisterPageButton("Home", navPlay);
+            RegisterPageButton("Overlays", navMods);
+            RegisterPageButton("Visual", navVisuals);
+            RegisterPageButton("Settings", navServers);
 
-            Panel nav = new Panel();
-            nav.Dock = DockStyle.Fill;
-            nav.BackColor = Color.FromArgb(11, 15, 23);
-            nav.Padding = new Padding(14, 18, 14, 18);
-            shell.Controls.Add(nav, 0, 1);
+            accountPillButton = CreateAccountPillButton();
+            UpdateAccountPill();
+            accountPillButton.Location = new Point(852, 18);
+            accountPillButton.Click += delegate { ShowPage("Account"); };
+            topBar.Controls.Add(accountPillButton);
+            RegisterPageButton("Account", accountPillButton);
 
-            Button navHome = CreateNavButton("Home");
-            Button navOverlays = CreateNavButton("Overlays");
-            Button navProfiles = CreateNavButton("Profiles");
-            Button navAccount = CreateNavButton("Account");
-            Button navVisual = CreateNavButton("Visual Pack");
-            Button navSettings = CreateNavButton("Settings");
-            navHome.Location = new Point(14, 18);
-            navOverlays.Location = new Point(14, 68);
-            navProfiles.Location = new Point(14, 118);
-            navAccount.Location = new Point(14, 168);
-            navVisual.Location = new Point(14, 218);
-            navSettings.Location = new Point(14, 268);
-            nav.Controls.Add(navHome);
-            nav.Controls.Add(navOverlays);
-            nav.Controls.Add(navProfiles);
-            nav.Controls.Add(navAccount);
-            nav.Controls.Add(navVisual);
-            nav.Controls.Add(navSettings);
+            Button profileIcon = CreateIconButton("ID", false);
+            profileIcon.Location = new Point(1016, 26);
+            profileIcon.Click += delegate { ShowPage("Profiles"); };
+            topBar.Controls.Add(profileIcon);
+            RegisterPageButton("Profiles", profileIcon);
 
-            statusLabel = new Label();
-            statusLabel.ForeColor = muted;
-            statusLabel.Text = "Ready";
-            statusLabel.AutoSize = false;
-            statusLabel.Size = new Size(164, 70);
-            statusLabel.Location = new Point(16, nav.Height - 92);
-            statusLabel.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-            nav.Controls.Add(statusLabel);
+            Button settingsIcon = CreateIconButton("⚙", false);
+            settingsIcon.Location = new Point(1058, 26);
+            settingsIcon.Click += delegate { ShowPage("Settings"); };
+            topBar.Controls.Add(settingsIcon);
+
+            Button maximize = CreateIconButton("□", false);
+            maximize.Location = new Point(1100, 26);
+            maximize.Click += delegate { WindowState = WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized; };
+            topBar.Controls.Add(maximize);
+
+            Button minimize = CreateIconButton("_", false);
+            minimize.Location = new Point(1142, 26);
+            minimize.Click += delegate { WindowState = FormWindowState.Minimized; };
+            topBar.Controls.Add(minimize);
+
+            Button close = CreateIconButton("X", true);
+            close.Location = new Point(1184, 26);
+            close.Click += delegate { Close(); };
+            topBar.Controls.Add(close);
+
+            topBar.Resize += delegate
+            {
+                navStrip.Left = Math.Max(260, (topBar.Width - navStrip.Width) / 2);
+                close.Left = topBar.Width - 52;
+                minimize.Left = close.Left - 42;
+                maximize.Left = minimize.Left - 42;
+                settingsIcon.Left = maximize.Left - 42;
+                profileIcon.Left = settingsIcon.Left - 42;
+                accountPillButton.Left = profileIcon.Left - accountPillButton.Width - 12;
+            };
 
             Panel content = new Panel();
             content.Dock = DockStyle.Fill;
             content.BackColor = bg;
-            content.Padding = new Padding(22);
-            shell.Controls.Add(content, 1, 1);
+            content.Padding = new Padding(26, 4, 26, 18);
+            shell.Controls.Add(content);
+            topBar.BringToFront();
 
             Panel homePage = BuildHomePage();
             Panel overlaysPage = BuildOverlaysPage();
@@ -963,12 +982,10 @@ namespace BombClient
             content.Controls.Add(visualPage);
             content.Controls.Add(settingsPage);
 
-            navHome.Click += delegate { ShowPage("Home"); };
-            navOverlays.Click += delegate { ShowPage("Overlays"); };
-            navProfiles.Click += delegate { ShowPage("Profiles"); };
-            navAccount.Click += delegate { ShowPage("Account"); };
-            navVisual.Click += delegate { ShowPage("Visual"); };
-            navSettings.Click += delegate { ShowPage("Settings"); };
+            navPlay.Click += delegate { ShowPage("Home"); };
+            navMods.Click += delegate { ShowPage("Overlays"); };
+            navVisuals.Click += delegate { ShowPage("Visual"); };
+            navServers.Click += delegate { ShowPage("Settings"); };
             ShowPage("Home");
 
             statusTimer = new Timer();
@@ -985,112 +1002,369 @@ namespace BombClient
             };
         }
 
+        private void DragWindow(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left)
+                return;
+            NativeMethods.ReleaseCapture();
+            NativeMethods.SendMessage(Handle, NativeMethods.WM_NCLBUTTONDOWN, NativeMethods.HTCAPTION, 0);
+        }
+
+        private void RegisterPageButton(string page, Button button)
+        {
+            pageButtons[page] = button;
+        }
+
+        private Button CreateTopNavButton(string label)
+        {
+            Button button = new Button();
+            button.Text = label;
+            button.Size = new Size(94, 34);
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = 0;
+            button.BackColor = Color.FromArgb(13, 18, 22);
+            button.ForeColor = muted;
+            button.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
+            button.Cursor = Cursors.Hand;
+            return button;
+        }
+
+        private Button CreateAccountPillButton()
+        {
+            Button button = new Button();
+            button.Size = new Size(160, 52);
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = 0;
+            button.BackColor = Color.FromArgb(9, 36, 20);
+            button.ForeColor = text;
+            button.Font = new Font("Segoe UI Semibold", 8.7f, FontStyle.Bold);
+            button.TextAlign = ContentAlignment.MiddleRight;
+            button.Padding = new Padding(12, 0, 10, 0);
+            button.Cursor = Cursors.Hand;
+            UpdateAccountPill();
+            return button;
+        }
+
+        private Button CreateIconButton(string label, bool danger)
+        {
+            Button button = new Button();
+            button.Text = label;
+            button.Size = new Size(34, 34);
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = 0;
+            button.BackColor = danger ? Color.FromArgb(42, 12, 17) : Color.FromArgb(14, 19, 27);
+            button.ForeColor = danger ? Color.FromArgb(242, 70, 76) : text;
+            button.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
+            button.Cursor = Cursors.Hand;
+            return button;
+        }
+
+        private void UpdateNavigationState(string active)
+        {
+            foreach (KeyValuePair<string, Button> entry in pageButtons)
+            {
+                bool selected = string.Equals(entry.Key, active, StringComparison.OrdinalIgnoreCase);
+                Button button = entry.Value;
+                if (button == accountPillButton)
+                {
+                    button.BackColor = selected ? Color.FromArgb(10, 58, 29) : Color.FromArgb(9, 36, 20);
+                    continue;
+                }
+                button.BackColor = selected ? Color.FromArgb(30, 35, 44) : Color.FromArgb(13, 18, 22);
+                button.ForeColor = selected ? text : muted;
+            }
+        }
+
+        private void UpdateAccountPill()
+        {
+            if (accountPillButton == null)
+                return;
+            string name = settings.AccountName.Length == 0 ? "Profile" : settings.AccountName;
+            accountPillButton.Text = "Signed in as\r\n" + ShortenText(name, 18);
+        }
+
+        private static string ShortenText(string value, int max)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length <= max)
+                return value;
+            return value.Substring(0, Math.Max(0, max - 3)) + "...";
+        }
+
         private Panel BuildHomePage()
         {
             Panel page = CreatePage();
-            Label heading = CreateHeading("Home");
-            heading.Location = new Point(0, 0);
-            page.Controls.Add(heading);
+            page.AutoScroll = false;
 
-            Panel launchCard = CreateCard(0, 54, 430, 194);
-            page.Controls.Add(launchCard);
-            Label launchTitle = CreateCardTitle("Launcher");
-            launchTitle.Location = new Point(20, 18);
-            launchCard.Controls.Add(launchTitle);
+            Panel hero = new Panel();
+            hero.BackColor = Color.FromArgb(13, 18, 23);
+            hero.Paint += DrawHeroPanel;
+            page.Controls.Add(hero);
 
-            minecraftLabel = CreateMutedLabel("Minecraft status");
-            minecraftLabel.Location = new Point(22, 54);
-            minecraftLabel.Size = new Size(360, 28);
-            launchCard.Controls.Add(minecraftLabel);
+            Label version = new Label();
+            version.Text = "Minecraft Bedrock";
+            version.ForeColor = text;
+            version.Font = new Font("Segoe UI Semibold", 16f, FontStyle.Bold);
+            version.TextAlign = ContentAlignment.MiddleCenter;
+            version.BackColor = Color.Transparent;
+            hero.Controls.Add(version);
 
-            Label profileLabel = CreateMutedLabel("Profile: " + LaunchProfileCatalog.Get(settings.LaunchProfile).Name);
-            profileLabel.Location = new Point(22, 78);
-            profileLabel.Size = new Size(360, 24);
-            launchCard.Controls.Add(profileLabel);
+            Button changeVersion = CreateDarkHeroButton("Change Version");
+            changeVersion.Click += delegate { ShowPage("Profiles"); };
+            hero.Controls.Add(changeVersion);
 
-            Button launch = CreatePrimaryButton("Launch Minecraft");
-            launch.Location = new Point(20, 118);
-            launch.Size = new Size(180, 42);
+            Button quickOverlays = CreateHeroSideButton("HUD");
+            quickOverlays.Click += delegate { ShowPage("Overlays"); };
+            hero.Controls.Add(quickOverlays);
+
+            Button quickAccount = CreateHeroSideButton("ID");
+            quickAccount.Click += delegate { ShowPage("Account"); };
+            hero.Controls.Add(quickAccount);
+
+            Button quickConsole = CreateHeroSideButton(">");
+            quickConsole.BackColor = red;
+            quickConsole.Click += delegate { LaunchMinecraft(); };
+            hero.Controls.Add(quickConsole);
+
+            Button launch = CreatePrimaryButton("LAUNCH MINECRAFT");
+            launch.Font = new Font("Segoe UI Semibold", 10.5f, FontStyle.Bold);
             launch.Click += delegate { LaunchMinecraft(); };
-            launchCard.Controls.Add(launch);
+            page.Controls.Add(launch);
 
-            Button openFolder = CreateSecondaryButton("Open Bedrock Folder");
-            openFolder.Location = new Point(214, 118);
-            openFolder.Size = new Size(180, 42);
-            openFolder.Click += delegate { OpenBedrockFolder(); };
-            launchCard.Controls.Add(openFolder);
+            Panel quickCard = CreateCard(0, 0, 430, 210);
+            page.Controls.Add(quickCard);
+            Label quickTitle = CreateCardTitle("QUICK ACTIONS");
+            quickTitle.Location = new Point(20, 18);
+            quickCard.Controls.Add(quickTitle);
 
-            Panel hudCard = CreateCard(452, 54, 430, 194);
-            page.Controls.Add(hudCard);
-            Label hudTitle = CreateCardTitle("HUD");
-            hudTitle.Location = new Point(20, 18);
-            hudCard.Controls.Add(hudTitle);
-
-            Button startOverlays = CreatePrimaryButton("Start Enabled Overlays");
-            startOverlays.Location = new Point(20, 58);
-            startOverlays.Size = new Size(180, 42);
+            Button startOverlays = CreatePrimaryButton("Start Overlays");
+            startOverlays.Location = new Point(22, 58);
+            startOverlays.Size = new Size(158, 40);
             startOverlays.Click += delegate
             {
                 PersistSettingsFromUi();
                 OverlayManager.ApplyConfiguredOverlays();
                 SetStatus("Enabled overlays started.");
             };
-            hudCard.Controls.Add(startOverlays);
+            quickCard.Controls.Add(startOverlays);
 
             Button stopOverlays = CreateSecondaryButton("Stop Overlays");
-            stopOverlays.Location = new Point(214, 58);
-            stopOverlays.Size = new Size(150, 42);
+            stopOverlays.Location = new Point(196, 58);
+            stopOverlays.Size = new Size(136, 40);
             stopOverlays.Click += delegate
             {
                 OverlayManager.CloseAll();
                 SetStatus("Overlays stopped.");
             };
-            hudCard.Controls.Add(stopOverlays);
+            quickCard.Controls.Add(stopOverlays);
 
-            CheckBox editMode = CreateCheck("HUD edit mode", settings.EditMode);
-            editMode.Location = new Point(22, 122);
-            editMode.CheckedChanged += delegate
-            {
-                settings.EditMode = editMode.Checked;
-                OverlayManager.SetEditMode(settings.EditMode);
-                settings.Save();
-            };
-            hudCard.Controls.Add(editMode);
-
-            Panel packCard = CreateCard(0, 274, 430, 194);
-            page.Controls.Add(packCard);
-            Label packTitle = CreateCardTitle("PvP Visual Pack");
-            packTitle.Location = new Point(20, 18);
-            packCard.Controls.Add(packTitle);
-
-            Button buildPack = CreatePrimaryButton("Build .mcpack");
-            buildPack.Location = new Point(20, 58);
-            buildPack.Size = new Size(150, 42);
+            Button buildPack = CreateSecondaryButton("Build Pack");
+            buildPack.Location = new Point(22, 114);
+            buildPack.Size = new Size(136, 40);
             buildPack.Click += delegate { BuildPack(false); };
-            packCard.Controls.Add(buildPack);
+            quickCard.Controls.Add(buildPack);
 
-            Button importPack = CreateSecondaryButton("Build and Import");
-            importPack.Location = new Point(184, 58);
-            importPack.Size = new Size(150, 42);
+            Button importPack = CreateSecondaryButton("Import Pack");
+            importPack.Location = new Point(174, 114);
+            importPack.Size = new Size(136, 40);
             importPack.Click += delegate { BuildPack(true); };
-            packCard.Controls.Add(importPack);
+            quickCard.Controls.Add(importPack);
 
-            Label packNote = CreateMutedLabel("Low fire, no bobber, clean pumpkin, clear vignette");
-            packNote.Location = new Point(22, 124);
-            packNote.Size = new Size(360, 40);
-            packCard.Controls.Add(packNote);
+            minecraftLabel = CreateMutedLabel("Minecraft status");
+            minecraftLabel.Location = new Point(22, 168);
+            minecraftLabel.Size = new Size(360, 24);
+            quickCard.Controls.Add(minecraftLabel);
 
-            Panel infoCard = CreateCard(452, 274, 430, 194);
-            page.Controls.Add(infoCard);
-            Label infoTitle = CreateCardTitle("External Mode");
-            infoTitle.Location = new Point(20, 18);
-            infoCard.Controls.Add(infoTitle);
-            Label info = CreateMutedLabel("Bomb Client launches Bedrock and draws Windows overlays above it. It does not inject code or patch the installed game.");
-            info.Location = new Point(22, 56);
-            info.Size = new Size(370, 76);
-            infoCard.Controls.Add(info);
+            Panel serversCard = CreateCard(0, 0, 430, 210);
+            page.Controls.Add(serversCard);
+            Label serversTitle = CreateCardTitle("PARTNER SERVERS");
+            serversTitle.Location = new Point(20, 18);
+            serversCard.Controls.Add(serversTitle);
+
+            AddServerRow(serversCard, "CubeCraft", "play.cubecraft.net", "630", 56);
+            AddServerRow(serversCard, "The Hive", "geo.hivebedrock.network", "273", 92);
+            AddServerRow(serversCard, "NetherGames", "play.nethergames.org", "200", 128);
+            AddServerRow(serversCard, "Lifeboat", "play.lbsg.net", "161", 164);
+
+            Panel rightRail = new Panel();
+            rightRail.BackColor = Color.FromArgb(14, 18, 23);
+            rightRail.Paint += DrawRightRailPanel;
+            page.Controls.Add(rightRail);
+
+            PictureBox railLogo = new PictureBox();
+            railLogo.Image = AssetLoader.LoadLogo();
+            railLogo.SizeMode = PictureBoxSizeMode.Zoom;
+            railLogo.BackColor = Color.Transparent;
+            rightRail.Controls.Add(railLogo);
+
+            Label railTitle = new Label();
+            railTitle.Text = "BOMB CLIENT";
+            railTitle.ForeColor = Color.FromArgb(156, 164, 174);
+            railTitle.Font = new Font("Segoe UI Semibold", 12f, FontStyle.Bold);
+            railTitle.AutoSize = true;
+            rightRail.Controls.Add(railTitle);
+
+            statusLabel = CreateMutedLabel("Ready");
+            statusLabel.Size = new Size(250, 52);
+            rightRail.Controls.Add(statusLabel);
+
+            page.Resize += delegate
+            {
+                LayoutFeatherHome(page, hero, version, changeVersion, quickOverlays, quickAccount, quickConsole, launch, quickCard, serversCard, rightRail, railLogo, railTitle);
+            };
+            LayoutFeatherHome(page, hero, version, changeVersion, quickOverlays, quickAccount, quickConsole, launch, quickCard, serversCard, rightRail, railLogo, railTitle);
 
             return page;
+        }
+
+        private Button CreateDarkHeroButton(string label)
+        {
+            Button button = CreateSecondaryButton(label);
+            button.BackColor = Color.Black;
+            button.ForeColor = text;
+            button.FlatAppearance.BorderColor = Color.Black;
+            return button;
+        }
+
+        private Button CreateHeroSideButton(string label)
+        {
+            Button button = CreateIconButton(label, false);
+            button.Size = new Size(46, 42);
+            button.BackColor = Color.FromArgb(32, 36, 43);
+            return button;
+        }
+
+        private void LayoutFeatherHome(Panel page, Panel hero, Label version, Button changeVersion, Button quickOverlays, Button quickAccount, Button quickConsole, Button launch, Panel quickCard, Panel serversCard, Panel rightRail, PictureBox railLogo, Label railTitle)
+        {
+            int viewport = Math.Max(900, page.ClientSize.Width - SystemInformation.VerticalScrollBarWidth);
+            int railWidth = viewport >= 1050 ? 270 : 0;
+            int gap = railWidth > 0 ? 22 : 0;
+            int mainWidth = viewport - railWidth - gap;
+
+            hero.Location = new Point(0, 0);
+            hero.Size = new Size(Math.Max(620, mainWidth), 290);
+            launch.Location = new Point(0, hero.Bottom + 14);
+            launch.Size = new Size(hero.Width, 52);
+
+            int cardTop = launch.Bottom + 16;
+            int cardGap = 16;
+            int cardWidth = (hero.Width - cardGap) / 2;
+            quickCard.Location = new Point(0, cardTop);
+            quickCard.Size = new Size(cardWidth, 214);
+            serversCard.Location = new Point(cardWidth + cardGap, cardTop);
+            serversCard.Size = new Size(hero.Width - cardWidth - cardGap, 214);
+
+            rightRail.Visible = railWidth > 0;
+            if (railWidth > 0)
+            {
+                rightRail.Location = new Point(mainWidth + gap, 0);
+                rightRail.Size = new Size(railWidth, Math.Max(520, page.ClientSize.Height - 8));
+                railLogo.Size = new Size(126, 126);
+                railLogo.Location = new Point((rightRail.Width - railLogo.Width) / 2, Math.Max(150, rightRail.Height / 2 - 108));
+                railTitle.Location = new Point((rightRail.Width - railTitle.Width) / 2, railLogo.Bottom + 14);
+                statusLabel.Location = new Point(20, rightRail.Height - 72);
+            }
+
+            version.Size = new Size(260, 34);
+            version.Location = new Point((hero.Width - version.Width) / 2, 112);
+            changeVersion.Size = new Size(190, 42);
+            changeVersion.Location = new Point((hero.Width - changeVersion.Width) / 2, version.Bottom + 22);
+
+            quickOverlays.Location = new Point(hero.Width - 62, hero.Height - 160);
+            quickAccount.Location = new Point(hero.Width - 62, hero.Height - 108);
+            quickConsole.Location = new Point(hero.Width - 62, hero.Height - 56);
+            hero.Invalidate();
+            rightRail.Invalidate();
+        }
+
+        private void AddServerRow(Panel parent, string name, string host, string count, int y)
+        {
+            Panel row = new Panel();
+            row.Location = new Point(20, y);
+            row.Size = new Size(parent.Width - 40, 30);
+            row.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            row.BackColor = Color.FromArgb(13, 18, 22);
+            row.Paint += delegate(object sender, PaintEventArgs e)
+            {
+                DrawRoundedPanel(e.Graphics, row.ClientRectangle, Color.FromArgb(13, 18, 22), 6);
+            };
+            parent.Controls.Add(row);
+
+            Label title = new Label();
+            title.Text = name;
+            title.ForeColor = text;
+            title.Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold);
+            title.Location = new Point(12, 6);
+            title.Size = new Size(150, 18);
+            row.Controls.Add(title);
+
+            Label ping = new Label();
+            ping.Text = count;
+            ping.ForeColor = Color.FromArgb(130, 230, 115);
+            ping.TextAlign = ContentAlignment.MiddleRight;
+            ping.Location = new Point(row.Width - 58, 6);
+            ping.Size = new Size(46, 18);
+            ping.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            row.Controls.Add(ping);
+        }
+
+        private void DrawHeroPanel(object sender, PaintEventArgs e)
+        {
+            Panel hero = sender as Panel;
+            if (hero == null)
+                return;
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            Rectangle bounds = new Rectangle(0, 0, hero.Width - 1, hero.Height - 1);
+            using (GraphicsPath path = RoundedRect(bounds, 8))
+            using (LinearGradientBrush sky = new LinearGradientBrush(bounds, Color.FromArgb(28, 38, 47), Color.FromArgb(8, 12, 18), LinearGradientMode.Vertical))
+            {
+                g.FillPath(sky, path);
+                g.SetClip(path);
+                DrawPixelScene(g, bounds);
+                using (SolidBrush shade = new SolidBrush(Color.FromArgb(178, 0, 0, 0)))
+                    g.FillRectangle(shade, bounds);
+                g.ResetClip();
+                using (Pen border = new Pen(Color.FromArgb(31, 38, 47)))
+                    g.DrawPath(border, path);
+            }
+        }
+
+        private void DrawPixelScene(Graphics g, Rectangle bounds)
+        {
+            using (SolidBrush water = new SolidBrush(Color.FromArgb(38, 70, 92)))
+                g.FillRectangle(water, 0, bounds.Height - 110, bounds.Width, 96);
+            using (SolidBrush ground = new SolidBrush(Color.FromArgb(88, 78, 58)))
+                g.FillRectangle(ground, 0, bounds.Height - 36, bounds.Width, 36);
+            using (SolidBrush hill = new SolidBrush(Color.FromArgb(44, 61, 42)))
+            {
+                g.FillRectangle(hill, 0, 42, bounds.Width / 3, 150);
+                g.FillRectangle(hill, bounds.Width / 2, 28, bounds.Width / 2, 162);
+            }
+            using (SolidBrush player = new SolidBrush(Color.FromArgb(128, 146, 160)))
+                g.FillRectangle(player, bounds.Width / 2 - 42, bounds.Height - 116, 52, 88);
+            using (SolidBrush mob = new SolidBrush(Color.FromArgb(64, 104, 70)))
+            {
+                g.FillRectangle(mob, bounds.Width - 190, bounds.Height - 104, 44, 72);
+                g.FillRectangle(mob, 126, bounds.Height - 98, 42, 66);
+            }
+        }
+
+        private void DrawRightRailPanel(object sender, PaintEventArgs e)
+        {
+            Panel rail = sender as Panel;
+            if (rail == null)
+                return;
+            DrawRoundedPanel(e.Graphics, rail.ClientRectangle, Color.FromArgb(14, 18, 23), 8);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (Pen arc = new Pen(Color.FromArgb(18, 255, 255, 255), 70))
+                e.Graphics.DrawArc(arc, new Rectangle(-120, 10, rail.Width + 190, rail.Height - 80), 220, 190);
+            using (SolidBrush plus = new SolidBrush(Color.FromArgb(18, 255, 255, 255)))
+            {
+                e.Graphics.FillRectangle(plus, rail.Width - 46, 170, 28, 6);
+                e.Graphics.FillRectangle(plus, rail.Width - 35, 159, 6, 28);
+                e.Graphics.FillRectangle(plus, 42, rail.Height - 190, 28, 6);
+                e.Graphics.FillRectangle(plus, 53, rail.Height - 201, 6, 28);
+            }
         }
 
         private Panel BuildOverlaysPage()
@@ -1312,6 +1586,7 @@ namespace BombClient
             accountSignedInLabel.Text = connected
                 ? "Connected: " + EmptyFallback(settings.AccountSignedInAt, "Unknown") + ". Bomb Client stores only this display info, not Microsoft password or tokens."
                 : "Click Sign in with Microsoft to open the official Microsoft authentication page and connect this tab.";
+            UpdateAccountPill();
         }
 
         private static string EmptyFallback(string value, string fallback)
@@ -1749,6 +2024,7 @@ namespace BombClient
         {
             foreach (KeyValuePair<string, Panel> entry in pages)
                 entry.Value.Visible = string.Equals(entry.Key, name, StringComparison.OrdinalIgnoreCase);
+            UpdateNavigationState(name);
         }
 
         private void PersistSettingsFromUi()
@@ -3498,6 +3774,8 @@ namespace BombClient
         public const int WS_EX_TOOLWINDOW = 0x00000080;
         public const int WS_EX_LAYERED = 0x00080000;
         public const int CURSOR_SHOWING = 0x00000001;
+        public const int WM_NCLBUTTONDOWN = 0x00A1;
+        public const int HTCAPTION = 0x0002;
 
         [DllImport("user32.dll")]
         public static extern short GetAsyncKeyState(int vKey);
@@ -3519,6 +3797,12 @@ namespace BombClient
 
         [DllImport("user32.dll")]
         public static extern bool GetCursorInfo(out CURSORINFO pci);
+
+        [DllImport("user32.dll")]
+        public static extern bool ReleaseCapture();
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
