@@ -19,8 +19,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("Bomb Client")]
 [assembly: AssemblyCompany("EnderKraken914")]
 [assembly: AssemblyCopyright("Copyright 2026")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.1.1.0")]
+[assembly: AssemblyFileVersion("1.1.1.0")]
 
 namespace BombClient
 {
@@ -75,16 +75,15 @@ namespace BombClient
 
         public static readonly string SettingsFile = Path.Combine(DataRoot, "settings.ini");
         public static readonly string PackRoot = Path.Combine(DataRoot, "GeneratedPacks");
-        public static readonly string UpdateRoot = Path.Combine(DataRoot, "Updates");
     }
 
     internal static class AppInfo
     {
-        public const string Version = "1.1.0";
+        public const string Version = "1.1.1";
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
         public const string UpdateManifestUrl = "https://raw.githubusercontent.com/EnderKraken914/bomb-client/main/update.json";
-        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/raw/main/release/BombClient-Windows.zip";
+        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/raw/main/release/BombClient-Windows-1.1.1.zip";
     }
 
     internal sealed class UpdateManifest
@@ -130,13 +129,13 @@ namespace BombClient
                     "\nRequired: " + manifest.RequiredVersion +
                     "\nLatest: " + manifest.LatestVersion +
                     "\n\n" + manifest.Notes +
-                    "\n\nDownload and install the update now?",
+                    "\n\nOpen the public download now?",
                     "Bomb Client Update Required",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning);
 
                 if (result == DialogResult.Yes)
-                    DownloadAndRunUpdater(manifest);
+                    OpenUpdateDownload(manifest);
 
                 return false;
             }
@@ -147,13 +146,13 @@ namespace BombClient
                     "A newer Bomb Client update is available.\n\nInstalled: " + AppInfo.Version +
                     "\nLatest: " + manifest.LatestVersion +
                     "\n\n" + manifest.Notes +
-                    "\n\nDownload it now?",
+                    "\n\nOpen the public download now?",
                     "Bomb Client Update Available",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Information);
 
                 if (result == DialogResult.Yes)
-                    DownloadAndRunUpdater(manifest);
+                    OpenUpdateDownload(manifest);
             }
 
             return true;
@@ -206,56 +205,17 @@ namespace BombClient
             return string.Equals(match.Groups[1].Value, "true", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static void DownloadAndRunUpdater(UpdateManifest manifest)
+        private static void OpenUpdateDownload(UpdateManifest manifest)
         {
             try
             {
-                Directory.CreateDirectory(AppPaths.UpdateRoot);
-                string safeVersion = SanitizeFileName(manifest.LatestVersion);
-                string zipPath = Path.Combine(AppPaths.UpdateRoot, "BombClient-Windows-" + safeVersion + ".zip");
-                string extractPath = Path.Combine(AppPaths.UpdateRoot, "BombClient-Windows-" + safeVersion);
-                string scriptPath = Path.Combine(AppPaths.UpdateRoot, "Install-BombClient-Update.cmd");
-
-                if (Directory.Exists(extractPath))
-                    Directory.Delete(extractPath, true);
-                if (File.Exists(zipPath))
-                    File.Delete(zipPath);
-
-                using (TimeoutWebClient client = new TimeoutWebClient(30000))
-                {
-                    client.Headers.Add("User-Agent", "BombClient/" + AppInfo.Version);
-                    client.DownloadFile(manifest.DownloadUrl, zipPath);
-                }
-
-                ZipFile.ExtractToDirectory(zipPath, extractPath);
-                string newExe = Path.Combine(extractPath, "Bomb Client.exe");
-                if (!File.Exists(newExe))
-                    throw new FileNotFoundException("The update package did not contain Bomb Client.exe.");
-
-                string currentExe = Application.ExecutablePath;
-                string currentDir = Path.GetDirectoryName(currentExe);
-                string newReadme = Path.Combine(extractPath, "README.md");
-                string currentReadme = Path.Combine(currentDir, "README.md");
-
-                StringBuilder script = new StringBuilder();
-                script.AppendLine("@echo off");
-                script.AppendLine("setlocal");
-                script.AppendLine("title Bomb Client Updater");
-                script.AppendLine("echo Updating Bomb Client...");
-                script.AppendLine("timeout /t 2 /nobreak >nul");
-                script.AppendLine("copy /y \"" + newExe + "\" \"" + currentExe + "\" >nul");
-                if (File.Exists(newReadme))
-                    script.AppendLine("copy /y \"" + newReadme + "\" \"" + currentReadme + "\" >nul");
-                script.AppendLine("start \"\" \"" + currentExe + "\"");
-                script.AppendLine("exit /b 0");
-                File.WriteAllText(scriptPath, script.ToString(), Encoding.ASCII);
-
-                Process.Start(new ProcessStartInfo(scriptPath) { UseShellExecute = true, WorkingDirectory = AppPaths.UpdateRoot });
+                string target = string.IsNullOrWhiteSpace(manifest.DownloadUrl) ? manifest.ReleasePage : manifest.DownloadUrl;
+                Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
             }
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    "Bomb Client could not install the update automatically.\n\n" +
+                    "Bomb Client could not open the update download.\n\n" +
                     ex.Message +
                     "\n\nThe release page will open instead.",
                     "Bomb Client Update",
@@ -269,13 +229,6 @@ namespace BombClient
                 {
                 }
             }
-        }
-
-        private static string SanitizeFileName(string value)
-        {
-            foreach (char c in Path.GetInvalidFileNameChars())
-                value = value.Replace(c, '_');
-            return value.Length == 0 ? "latest" : value;
         }
     }
 
@@ -2485,16 +2438,15 @@ namespace BombClient
 
     internal static class InputTracker
     {
-        private static NativeMethods.HookProc keyboardProc = KeyboardHook;
-        private static NativeMethods.HookProc mouseProc = MouseHook;
-        private static IntPtr keyboardHook = IntPtr.Zero;
-        private static IntPtr mouseHook = IntPtr.Zero;
+        private static Timer pollTimer;
         private static readonly bool[] keyDown = new bool[256];
         private static readonly Queue<DateTime> leftClicks = new Queue<DateTime>();
         private static readonly Queue<DateTime> rightClicks = new Queue<DateTime>();
         private static readonly object sync = new object();
         private static DateTime lastLeftClick = DateTime.MinValue;
         private static int comboCount;
+        private static bool previousLeftDown;
+        private static bool previousRightDown;
         public static bool LeftDown;
         public static bool RightDown;
 
@@ -2537,23 +2489,31 @@ namespace BombClient
 
         public static void Install()
         {
-            if (keyboardHook == IntPtr.Zero)
-                keyboardHook = NativeMethods.SetWindowsHookEx(NativeMethods.WH_KEYBOARD_LL, keyboardProc, IntPtr.Zero, 0);
-            if (mouseHook == IntPtr.Zero)
-                mouseHook = NativeMethods.SetWindowsHookEx(NativeMethods.WH_MOUSE_LL, mouseProc, IntPtr.Zero, 0);
+            if (pollTimer != null)
+                return;
+
+            pollTimer = new Timer();
+            pollTimer.Interval = 16;
+            pollTimer.Tick += delegate { PollForegroundInput(); };
+            pollTimer.Start();
         }
 
         public static void Uninstall()
         {
-            if (keyboardHook != IntPtr.Zero)
+            if (pollTimer != null)
             {
-                NativeMethods.UnhookWindowsHookEx(keyboardHook);
-                keyboardHook = IntPtr.Zero;
+                pollTimer.Stop();
+                pollTimer.Dispose();
+                pollTimer = null;
             }
-            if (mouseHook != IntPtr.Zero)
+
+            lock (sync)
             {
-                NativeMethods.UnhookWindowsHookEx(mouseHook);
-                mouseHook = IntPtr.Zero;
+                Array.Clear(keyDown, 0, keyDown.Length);
+                LeftDown = false;
+                RightDown = false;
+                previousLeftDown = false;
+                previousRightDown = false;
             }
         }
 
@@ -2565,71 +2525,56 @@ namespace BombClient
             return keyDown[index];
         }
 
-        private static IntPtr KeyboardHook(int code, IntPtr wParam, IntPtr lParam)
+        private static void PollForegroundInput()
         {
-            if (code >= 0)
-            {
-                int vkCode = Marshal.ReadInt32(lParam);
-                if (vkCode >= 0 && vkCode < keyDown.Length)
-                {
-                    int msg = wParam.ToInt32();
-                    if (msg == NativeMethods.WM_KEYDOWN || msg == NativeMethods.WM_SYSKEYDOWN)
-                    {
-                        keyDown[vkCode] = true;
-                        if (vkCode == (int)Keys.ShiftKey || vkCode == (int)Keys.LShiftKey || vkCode == (int)Keys.RShiftKey)
-                            keyDown[(int)Keys.ShiftKey] = true;
-                        if (vkCode == (int)Keys.Menu || vkCode == (int)Keys.LMenu || vkCode == (int)Keys.RMenu)
-                            keyDown[(int)Keys.Menu] = true;
-                    }
-                    else if (msg == NativeMethods.WM_KEYUP || msg == NativeMethods.WM_SYSKEYUP)
-                    {
-                        keyDown[vkCode] = false;
-                        if (vkCode == (int)Keys.ShiftKey || vkCode == (int)Keys.LShiftKey || vkCode == (int)Keys.RShiftKey)
-                            keyDown[(int)Keys.ShiftKey] = false;
-                        if (vkCode == (int)Keys.Menu || vkCode == (int)Keys.LMenu || vkCode == (int)Keys.RMenu)
-                            keyDown[(int)Keys.Menu] = false;
-                    }
-                }
-            }
-            return NativeMethods.CallNextHookEx(keyboardHook, code, wParam, lParam);
-        }
+            bool active = MinecraftInfo.IsMinecraftForeground();
+            DateTime now = DateTime.UtcNow;
 
-        private static IntPtr MouseHook(int code, IntPtr wParam, IntPtr lParam)
-        {
-            if (code >= 0)
+            lock (sync)
             {
-                int msg = wParam.ToInt32();
-                DateTime now = DateTime.UtcNow;
-                lock (sync)
+                if (!active)
                 {
-                    if (msg == NativeMethods.WM_LBUTTONDOWN)
-                    {
-                        LeftDown = true;
-                        leftClicks.Enqueue(now);
-                        if ((now - lastLeftClick).TotalMilliseconds > 1400)
-                            comboCount = 0;
-                        comboCount++;
-                        lastLeftClick = now;
-                    }
-                    else if (msg == NativeMethods.WM_LBUTTONUP)
-                    {
-                        LeftDown = false;
-                    }
-                    else if (msg == NativeMethods.WM_RBUTTONDOWN)
-                    {
-                        RightDown = true;
-                        rightClicks.Enqueue(now);
-                    }
-                    else if (msg == NativeMethods.WM_RBUTTONUP)
-                    {
-                        RightDown = false;
-                    }
-
+                    Array.Clear(keyDown, 0, keyDown.Length);
+                    LeftDown = false;
+                    RightDown = false;
+                    previousLeftDown = false;
+                    previousRightDown = false;
                     Trim(leftClicks);
                     Trim(rightClicks);
+                    return;
                 }
+
+                for (int i = 0; i < keyDown.Length; i++)
+                    keyDown[i] = IsAsyncKeyDown(i);
+
+                keyDown[(int)Keys.ShiftKey] = keyDown[(int)Keys.LShiftKey] || keyDown[(int)Keys.RShiftKey] || keyDown[(int)Keys.ShiftKey];
+                keyDown[(int)Keys.Menu] = keyDown[(int)Keys.LMenu] || keyDown[(int)Keys.RMenu] || keyDown[(int)Keys.Menu];
+
+                LeftDown = IsAsyncKeyDown((int)Keys.LButton);
+                RightDown = IsAsyncKeyDown((int)Keys.RButton);
+
+                if (LeftDown && !previousLeftDown)
+                {
+                    leftClicks.Enqueue(now);
+                    if ((now - lastLeftClick).TotalMilliseconds > 1400)
+                        comboCount = 0;
+                    comboCount++;
+                    lastLeftClick = now;
+                }
+
+                if (RightDown && !previousRightDown)
+                    rightClicks.Enqueue(now);
+
+                previousLeftDown = LeftDown;
+                previousRightDown = RightDown;
+                Trim(leftClicks);
+                Trim(rightClicks);
             }
-            return NativeMethods.CallNextHookEx(mouseHook, code, wParam, lParam);
+        }
+
+        private static bool IsAsyncKeyDown(int virtualKey)
+        {
+            return (NativeMethods.GetAsyncKeyState(virtualKey) & unchecked((short)0x8000)) != 0;
         }
 
         private static void Trim(Queue<DateTime> queue)
@@ -3173,32 +3118,14 @@ namespace BombClient
 
     internal static class NativeMethods
     {
-        public const int WH_KEYBOARD_LL = 13;
-        public const int WH_MOUSE_LL = 14;
-        public const int WM_KEYDOWN = 0x0100;
-        public const int WM_KEYUP = 0x0101;
-        public const int WM_SYSKEYDOWN = 0x0104;
-        public const int WM_SYSKEYUP = 0x0105;
-        public const int WM_LBUTTONDOWN = 0x0201;
-        public const int WM_LBUTTONUP = 0x0202;
-        public const int WM_RBUTTONDOWN = 0x0204;
-        public const int WM_RBUTTONUP = 0x0205;
         public const int GWL_EXSTYLE = -20;
         public const int WS_EX_TRANSPARENT = 0x00000020;
         public const int WS_EX_TOOLWINDOW = 0x00000080;
         public const int WS_EX_LAYERED = 0x00080000;
         public const int CURSOR_SHOWING = 0x00000001;
 
-        public delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        public static extern IntPtr SetWindowsHookEx(int idHook, HookProc lpfn, IntPtr hMod, uint dwThreadId);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        public static extern bool UnhookWindowsHookEx(IntPtr hhk);
-
         [DllImport("user32.dll")]
-        public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+        public static extern short GetAsyncKeyState(int vKey);
 
         [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
         public static extern int GetWindowLong(IntPtr hWnd, int nIndex);

@@ -1,8 +1,8 @@
 {
-  "latest_version": "1.1.0",
-  "required_version": "1.1.0",
+  "latest_version": "1.1.1",
+  "required_version": "1.1.1",
   "force_update": true,
-  "download_url": "https://github.com/EnderKraken914/bomb-client/raw/main/release/BombClient-Windows.zip",
+  "download_url": "https://github.com/EnderKraken914/bomb-client/raw/main/release/BombClient-Windows-1.1.1.zip",
   "release_page": "https://github.com/EnderKraken914/bomb-client/releases/latest",
-  "notes": "Adds low shield, small totem/totem pop resource-pack options, overlay size controls, and new Armor/Potion/Hotbar/Shulker HUD modules."
+  "notes": "Safer distribution build: removes global keyboard/mouse hooks and self-replacing updater behavior to reduce antivirus false positives."
 }

@@ -6,7 +6,7 @@ build/
 *.log
 *.zip
 !release/
-!release/BombClient-Windows.zip
+!release/*.zip
 *.mcpack
 *.pdb
 *.cache
