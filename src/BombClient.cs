@@ -19,8 +19,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("Bomb Client")]
 [assembly: AssemblyCompany("EnderKraken914")]
 [assembly: AssemblyCopyright("Copyright 2026")]
-[assembly: AssemblyVersion("1.1.3.0")]
-[assembly: AssemblyFileVersion("1.1.3.0")]
+[assembly: AssemblyVersion("1.1.4.0")]
+[assembly: AssemblyFileVersion("1.1.4.0")]
 
 namespace BombClient
 {
@@ -79,11 +79,11 @@ namespace BombClient
 
     internal static class AppInfo
     {
-        public const string Version = "1.1.3";
+        public const string Version = "1.1.4";
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
         public const string UpdateManifestUrl = "https://api.github.com/repos/EnderKraken914/bomb-client/contents/update.json?ref=main";
-        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.3/BombClient-Windows-1.1.3.zip";
+        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.4/BombClient-Windows-1.1.4.zip";
     }
 
     internal sealed class UpdateManifest
@@ -251,6 +251,225 @@ namespace BombClient
         }
     }
 
+    internal sealed class MicrosoftDeviceCode
+    {
+        public string DeviceCode = "";
+        public string UserCode = "";
+        public string VerificationUri = "";
+        public string VerificationUriComplete = "";
+        public string Message = "";
+        public int ExpiresIn = 900;
+        public int Interval = 5;
+    }
+
+    internal sealed class MicrosoftAccountProfile
+    {
+        public string DisplayName = "";
+        public string Email = "";
+    }
+
+    internal static class MicrosoftAccountAuthenticator
+    {
+        private const string DeviceCodeUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
+        private const string TokenUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
+        private const string GraphMeUrl = "https://graph.microsoft.com/v1.0/me?$select=displayName,mail,userPrincipalName";
+        private const string Scope = "User.Read openid profile email";
+
+        public static MicrosoftAccountProfile SignIn(string clientId, Action<string> status)
+        {
+            if (string.IsNullOrWhiteSpace(clientId))
+                throw new InvalidOperationException("Add a Microsoft OAuth client ID first.");
+
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            MicrosoftDeviceCode device = RequestDeviceCode(clientId.Trim());
+            if (status != null)
+                status("Microsoft sign-in opened. Complete the browser prompt.");
+            OpenVerificationPage(device);
+
+            string accessToken = PollForAccessToken(clientId.Trim(), device, status);
+            if (status != null)
+                status("Microsoft approved the sign-in. Reading profile...");
+            return FetchProfile(accessToken);
+        }
+
+        private static MicrosoftDeviceCode RequestDeviceCode(string clientId)
+        {
+            Dictionary<string, string> fields = new Dictionary<string, string>();
+            fields["client_id"] = clientId;
+            fields["scope"] = Scope;
+
+            string json = PostForm(DeviceCodeUrl, fields, 15000);
+            MicrosoftDeviceCode device = new MicrosoftDeviceCode();
+            device.DeviceCode = ReadJsonString(json, "device_code", "");
+            device.UserCode = ReadJsonString(json, "user_code", "");
+            device.VerificationUri = ReadJsonString(json, "verification_uri", "");
+            device.VerificationUriComplete = ReadJsonString(json, "verification_uri_complete", "");
+            device.Message = ReadJsonString(json, "message", "");
+            device.ExpiresIn = ReadJsonInt(json, "expires_in", 900);
+            device.Interval = Math.Max(2, ReadJsonInt(json, "interval", 5));
+
+            if (device.DeviceCode.Length == 0 || device.VerificationUri.Length == 0)
+                throw new InvalidOperationException("Microsoft did not return a usable sign-in code.");
+
+            return device;
+        }
+
+        private static void OpenVerificationPage(MicrosoftDeviceCode device)
+        {
+            string target = device.VerificationUriComplete.Length == 0 ? device.VerificationUri : device.VerificationUriComplete;
+            Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+        }
+
+        private static string PollForAccessToken(string clientId, MicrosoftDeviceCode device, Action<string> status)
+        {
+            DateTime deadline = DateTime.UtcNow.AddSeconds(device.ExpiresIn);
+            int interval = device.Interval;
+
+            while (DateTime.UtcNow < deadline)
+            {
+                System.Threading.Thread.Sleep(interval * 1000);
+
+                Dictionary<string, string> fields = new Dictionary<string, string>();
+                fields["grant_type"] = "urn:ietf:params:oauth:grant-type:device_code";
+                fields["client_id"] = clientId;
+                fields["device_code"] = device.DeviceCode;
+
+                string json;
+                try
+                {
+                    json = PostForm(TokenUrl, fields, 15000);
+                }
+                catch (MicrosoftOAuthException ex)
+                {
+                    if (string.Equals(ex.Error, "authorization_pending", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (status != null)
+                            status("Waiting for Microsoft sign-in approval...");
+                        continue;
+                    }
+                    if (string.Equals(ex.Error, "slow_down", StringComparison.OrdinalIgnoreCase))
+                    {
+                        interval += 5;
+                        continue;
+                    }
+                    if (string.Equals(ex.Error, "authorization_declined", StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("Microsoft sign-in was declined.");
+                    if (string.Equals(ex.Error, "expired_token", StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("Microsoft sign-in expired. Try again.");
+
+                    throw new InvalidOperationException(ex.Description.Length == 0 ? "Microsoft sign-in failed." : ex.Description);
+                }
+
+                string accessToken = ReadJsonString(json, "access_token", "");
+                if (accessToken.Length > 0)
+                    return accessToken;
+            }
+
+            throw new InvalidOperationException("Microsoft sign-in expired. Try again.");
+        }
+
+        private static MicrosoftAccountProfile FetchProfile(string accessToken)
+        {
+            using (TimeoutWebClient client = new TimeoutWebClient(15000))
+            {
+                client.Headers.Add("Authorization", "Bearer " + accessToken);
+                client.Headers.Add("User-Agent", "BombClient/" + AppInfo.Version);
+                string json = client.DownloadString(GraphMeUrl);
+
+                MicrosoftAccountProfile profile = new MicrosoftAccountProfile();
+                profile.DisplayName = ReadJsonString(json, "displayName", "");
+                profile.Email = ReadJsonString(json, "mail", "");
+                if (profile.Email.Length == 0)
+                    profile.Email = ReadJsonString(json, "userPrincipalName", "");
+                if (profile.DisplayName.Length == 0)
+                    profile.DisplayName = "Microsoft account";
+                return profile;
+            }
+        }
+
+        private static string PostForm(string url, Dictionary<string, string> fields, int timeoutMs)
+        {
+            using (TimeoutWebClient client = new TimeoutWebClient(timeoutMs))
+            {
+                client.Headers.Add("Content-Type", "application/x-www-form-urlencoded");
+                client.Headers.Add("User-Agent", "BombClient/" + AppInfo.Version);
+                try
+                {
+                    return client.UploadString(url, "POST", EncodeForm(fields));
+                }
+                catch (WebException ex)
+                {
+                    string body = "";
+                    if (ex.Response != null)
+                    {
+                        using (Stream stream = ex.Response.GetResponseStream())
+                        {
+                            if (stream != null)
+                            {
+                                using (StreamReader reader = new StreamReader(stream))
+                                    body = reader.ReadToEnd();
+                            }
+                        }
+                    }
+
+                    string error = ReadJsonString(body, "error", "");
+                    string description = ReadJsonString(body, "error_description", "");
+                    if (error.Length > 0)
+                        throw new MicrosoftOAuthException(error, description);
+                    throw;
+                }
+            }
+        }
+
+        private static string EncodeForm(Dictionary<string, string> fields)
+        {
+            StringBuilder builder = new StringBuilder();
+            foreach (KeyValuePair<string, string> field in fields)
+            {
+                if (builder.Length > 0)
+                    builder.Append('&');
+                builder.Append(Uri.EscapeDataString(field.Key));
+                builder.Append('=');
+                builder.Append(Uri.EscapeDataString(field.Value));
+            }
+            return builder.ToString();
+        }
+
+        private static string ReadJsonString(string json, string key, string fallback)
+        {
+            if (json == null)
+                return fallback;
+            Match match = Regex.Match(json, "\"" + Regex.Escape(key) + "\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"", RegexOptions.IgnoreCase);
+            if (!match.Success)
+                return fallback;
+            return Regex.Unescape(match.Groups[1].Value);
+        }
+
+        private static int ReadJsonInt(string json, string key, int fallback)
+        {
+            if (json == null)
+                return fallback;
+            Match match = Regex.Match(json, "\"" + Regex.Escape(key) + "\"\\s*:\\s*(\\d+)", RegexOptions.IgnoreCase);
+            if (!match.Success)
+                return fallback;
+            int value;
+            return int.TryParse(match.Groups[1].Value, out value) ? value : fallback;
+        }
+    }
+
+    internal sealed class MicrosoftOAuthException : Exception
+    {
+        public readonly string Error;
+        public readonly string Description;
+
+        public MicrosoftOAuthException(string error, string description)
+            : base(description.Length == 0 ? error : description)
+        {
+            Error = error;
+            Description = description;
+        }
+    }
+
     internal sealed class AppSettings
     {
         public readonly Dictionary<string, bool> Overlays = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
@@ -273,6 +492,10 @@ namespace BombClient
         public int VisualTotemPopSize = 48;
         public bool VisualCleanPumpkin = true;
         public bool VisualClearVignette = true;
+        public string MicrosoftClientId = "";
+        public string AccountName = "";
+        public string AccountEmail = "";
+        public string AccountSignedInAt = "";
 
         public static AppSettings Load()
         {
@@ -393,6 +616,22 @@ namespace BombClient
                 {
                     settings.VisualClearVignette = ParseBool(value, true);
                 }
+                else if (key.Equals("account.microsoftClientId", StringComparison.OrdinalIgnoreCase))
+                {
+                    settings.MicrosoftClientId = value;
+                }
+                else if (key.Equals("account.name", StringComparison.OrdinalIgnoreCase))
+                {
+                    settings.AccountName = value;
+                }
+                else if (key.Equals("account.email", StringComparison.OrdinalIgnoreCase))
+                {
+                    settings.AccountEmail = value;
+                }
+                else if (key.Equals("account.signedInAt", StringComparison.OrdinalIgnoreCase))
+                {
+                    settings.AccountSignedInAt = value;
+                }
             }
 
             foreach (OverlayDefinition def in OverlayCatalog.All)
@@ -435,6 +674,10 @@ namespace BombClient
             lines.Add("visual.totemPopSize=" + VisualTotemPopSize.ToString());
             lines.Add("visual.cleanPumpkin=" + VisualCleanPumpkin.ToString());
             lines.Add("visual.clearVignette=" + VisualClearVignette.ToString());
+            lines.Add("account.microsoftClientId=" + MicrosoftClientId);
+            lines.Add("account.name=" + AccountName);
+            lines.Add("account.email=" + AccountEmail);
+            lines.Add("account.signedInAt=" + AccountSignedInAt);
 
             foreach (OverlayDefinition def in OverlayCatalog.All)
             {
@@ -562,6 +805,11 @@ namespace BombClient
         private Label minecraftLabel;
         private ComboBox launchProfileBox;
         private TextBox customLaunchBox;
+        private TextBox microsoftClientIdBox;
+        private Label accountNameLabel;
+        private Label accountEmailLabel;
+        private Label accountSignedInLabel;
+        private Button microsoftSignInButton;
         private TextBox serverHostBox;
         private NumericUpDown serverPortBox;
         private TrackBar opacityTrack;
@@ -1001,79 +1249,202 @@ namespace BombClient
                 launchProfileBox.SelectedIndex = 0;
         }
 
+        private async Task BeginMicrosoftAccountSignIn()
+        {
+            if (microsoftClientIdBox != null)
+                settings.MicrosoftClientId = microsoftClientIdBox.Text.Trim();
+
+            if (settings.MicrosoftClientId.Length == 0)
+            {
+                MessageBox.Show(
+                    "Microsoft requires an OAuth app client ID before Bomb Client can read your profile.\n\n" +
+                    "Create a Microsoft identity platform app registration for personal Microsoft accounts, enable public client/device-code flow, then paste the Application (client) ID into this tab.",
+                    "Bomb Client",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            if (microsoftSignInButton != null)
+                microsoftSignInButton.Enabled = false;
+
+            try
+            {
+                settings.Save();
+                SetStatus("Starting Microsoft sign-in...");
+
+                MicrosoftAccountProfile profile = await Task.Run(delegate
+                {
+                    return MicrosoftAccountAuthenticator.SignIn(settings.MicrosoftClientId, delegate(string message)
+                    {
+                        if (!IsDisposed && IsHandleCreated)
+                            BeginInvoke(new Action(delegate { SetStatus(message); }));
+                    });
+                });
+
+                settings.AccountName = profile.DisplayName;
+                settings.AccountEmail = profile.Email;
+                settings.AccountSignedInAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+                settings.Save();
+                RefreshAccountLabels();
+                SetStatus("Microsoft account connected.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Microsoft sign-in failed.\n\n" + ex.Message, "Bomb Client", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                SetStatus("Microsoft sign-in failed.");
+            }
+            finally
+            {
+                if (microsoftSignInButton != null)
+                    microsoftSignInButton.Enabled = true;
+            }
+        }
+
+        private void RefreshAccountLabels()
+        {
+            if (accountNameLabel == null || accountEmailLabel == null || accountSignedInLabel == null)
+                return;
+
+            bool connected = settings.AccountName.Length > 0 || settings.AccountEmail.Length > 0;
+            accountNameLabel.Text = connected ? "Minecraft / Microsoft name: " + EmptyFallback(settings.AccountName, "Unknown") : "Minecraft / Microsoft name: Not connected";
+            accountEmailLabel.Text = connected ? "Email: " + EmptyFallback(settings.AccountEmail, "Unavailable") : "Email: Not connected";
+            accountSignedInLabel.Text = connected
+                ? "Connected: " + EmptyFallback(settings.AccountSignedInAt, "Unknown") + ". Bomb Client stores only this display info, not Microsoft password or tokens."
+                : "Click Sign in with Microsoft to open the official Microsoft authentication page and connect this tab.";
+        }
+
+        private static string EmptyFallback(string value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value) ? fallback : value;
+        }
+
         private Panel BuildAccountPage()
         {
             Panel page = CreatePage();
+            page.AutoScroll = true;
             Label heading = CreateHeading("Account");
             heading.Location = new Point(0, 0);
             page.Controls.Add(heading);
 
-            Panel signInCard = CreateCard(0, 54, 700, 280);
+            Panel signInCard = CreateCard(0, 54, 740, 306);
             page.Controls.Add(signInCard);
             Label title = CreateCardTitle("Microsoft Account");
             title.Location = new Point(20, 18);
             signInCard.Controls.Add(title);
 
-            Label note = CreateMutedLabel("Sign in through Minecraft, Xbox, or Windows. Bomb Client never asks for your Microsoft password and does not store account tokens.");
+            Label note = CreateMutedLabel("Use official Microsoft authentication to connect a profile. Bomb Client opens Microsoft in your browser and saves only the display name and email shown below.");
             note.Location = new Point(22, 56);
-            note.Size = new Size(620, 48);
+            note.Size = new Size(660, 44);
             signInCard.Controls.Add(note);
 
-            Button minecraftSignIn = CreatePrimaryButton("Open Minecraft Sign-In");
-            minecraftSignIn.Location = new Point(22, 120);
-            minecraftSignIn.Size = new Size(190, 42);
-            minecraftSignIn.Click += delegate
+            Label clientIdLabel = CreateMutedLabel("Microsoft OAuth Client ID");
+            clientIdLabel.Location = new Point(22, 112);
+            clientIdLabel.Size = new Size(210, 24);
+            signInCard.Controls.Add(clientIdLabel);
+
+            microsoftClientIdBox = new TextBox();
+            microsoftClientIdBox.BackColor = Color.FromArgb(30, 37, 51);
+            microsoftClientIdBox.ForeColor = text;
+            microsoftClientIdBox.BorderStyle = BorderStyle.FixedSingle;
+            microsoftClientIdBox.Location = new Point(230, 112);
+            microsoftClientIdBox.Size = new Size(310, 24);
+            microsoftClientIdBox.Text = settings.MicrosoftClientId;
+            signInCard.Controls.Add(microsoftClientIdBox);
+
+            Button saveClientId = CreateSecondaryButton("Save ID");
+            saveClientId.Location = new Point(558, 106);
+            saveClientId.Size = new Size(128, 36);
+            saveClientId.Click += delegate
             {
-                LaunchMinecraft();
-                SetStatus("Use Minecraft's profile/sign-in button to sign in.");
+                settings.MicrosoftClientId = microsoftClientIdBox.Text.Trim();
+                settings.Save();
+                SetStatus("Microsoft client ID saved.");
             };
-            signInCard.Controls.Add(minecraftSignIn);
+            signInCard.Controls.Add(saveClientId);
+
+            microsoftSignInButton = CreatePrimaryButton("Sign in with Microsoft");
+            microsoftSignInButton.Location = new Point(22, 162);
+            microsoftSignInButton.Size = new Size(230, 42);
+            microsoftSignInButton.Click += async delegate { await BeginMicrosoftAccountSignIn(); };
+            signInCard.Controls.Add(microsoftSignInButton);
+
+            Button signOut = CreateSecondaryButton("Forget Account");
+            signOut.Location = new Point(270, 162);
+            signOut.Size = new Size(150, 42);
+            signOut.Click += delegate
+            {
+                settings.AccountName = "";
+                settings.AccountEmail = "";
+                settings.AccountSignedInAt = "";
+                settings.Save();
+                RefreshAccountLabels();
+                SetStatus("Saved Microsoft account details cleared.");
+            };
+            signInCard.Controls.Add(signOut);
 
             Button xboxSignIn = CreateSecondaryButton("Open Xbox App");
-            xboxSignIn.Location = new Point(230, 120);
+            xboxSignIn.Location = new Point(438, 162);
             xboxSignIn.Size = new Size(150, 42);
             xboxSignIn.Click += delegate { OpenAccountTarget("xbox:", "Xbox app opened."); };
             signInCard.Controls.Add(xboxSignIn);
 
             Button windowsAccounts = CreateSecondaryButton("Windows Accounts");
-            windowsAccounts.Location = new Point(398, 120);
-            windowsAccounts.Size = new Size(170, 42);
+            windowsAccounts.Location = new Point(606, 162);
+            windowsAccounts.Size = new Size(118, 42);
             windowsAccounts.Click += delegate { OpenAccountTarget("ms-settings:emailandaccounts", "Windows account settings opened."); };
             signInCard.Controls.Add(windowsAccounts);
 
             Button minecraftWeb = CreateSecondaryButton("Minecraft Account Page");
-            minecraftWeb.Location = new Point(22, 178);
+            minecraftWeb.Location = new Point(22, 224);
             minecraftWeb.Size = new Size(190, 42);
             minecraftWeb.Click += delegate { OpenAccountTarget("https://www.minecraft.net/msaprofile", "Minecraft account page opened."); };
             signInCard.Controls.Add(minecraftWeb);
 
             Button microsoftWeb = CreateSecondaryButton("Microsoft Account");
-            microsoftWeb.Location = new Point(230, 178);
+            microsoftWeb.Location = new Point(230, 224);
             microsoftWeb.Size = new Size(150, 42);
             microsoftWeb.Click += delegate { OpenAccountTarget("https://account.microsoft.com/", "Microsoft account page opened."); };
             signInCard.Controls.Add(microsoftWeb);
 
             Button store = CreateSecondaryButton("Microsoft Store");
-            store.Location = new Point(398, 178);
+            store.Location = new Point(398, 224);
             store.Size = new Size(170, 42);
             store.Click += delegate { OpenAccountTarget("ms-windows-store://home", "Microsoft Store opened."); };
             signInCard.Controls.Add(store);
 
-            Label hint = CreateMutedLabel("If Minecraft says you are not signed in, sign into the Xbox app and Windows account settings first, then reopen Minecraft from Bomb Client.");
-            hint.Location = new Point(24, 236);
-            hint.Size = new Size(620, 28);
+            Button appSetup = CreateSecondaryButton("OAuth Setup");
+            appSetup.Location = new Point(586, 224);
+            appSetup.Size = new Size(138, 42);
+            appSetup.Click += delegate { OpenAccountTarget("https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app", "Microsoft app registration guide opened."); };
+            signInCard.Controls.Add(appSetup);
+
+            Label hint = CreateMutedLabel("The sign-in button uses Microsoft device-code auth. If the Client ID is empty, create a public client app registration and paste its Application ID here.");
+            hint.Location = new Point(24, 274);
+            hint.Size = new Size(674, 24);
             signInCard.Controls.Add(hint);
 
-            Panel statusCard = CreateCard(0, 360, 700, 146);
+            Panel statusCard = CreateCard(0, 390, 740, 188);
             page.Controls.Add(statusCard);
             Label statusTitle = CreateCardTitle("Account Status");
             statusTitle.Location = new Point(20, 18);
             statusCard.Controls.Add(statusTitle);
 
-            Label status = CreateMutedLabel("Microsoft sign-in status is protected by Minecraft/Xbox. Bomb Client can open the official sign-in surfaces, but the game decides which account is active.");
-            status.Location = new Point(22, 58);
-            status.Size = new Size(620, 54);
-            statusCard.Controls.Add(status);
+            accountNameLabel = CreateMutedLabel("");
+            accountNameLabel.Location = new Point(22, 58);
+            accountNameLabel.Size = new Size(660, 28);
+            statusCard.Controls.Add(accountNameLabel);
+
+            accountEmailLabel = CreateMutedLabel("");
+            accountEmailLabel.Location = new Point(22, 92);
+            accountEmailLabel.Size = new Size(660, 28);
+            statusCard.Controls.Add(accountEmailLabel);
+
+            accountSignedInLabel = CreateMutedLabel("");
+            accountSignedInLabel.Location = new Point(22, 126);
+            accountSignedInLabel.Size = new Size(660, 44);
+            statusCard.Controls.Add(accountSignedInLabel);
+            RefreshAccountLabels();
 
             return page;
         }
@@ -1400,6 +1771,8 @@ namespace BombClient
             }
             if (customLaunchBox != null)
                 settings.CustomLaunchTarget = customLaunchBox.Text.Trim();
+            if (microsoftClientIdBox != null)
+                settings.MicrosoftClientId = microsoftClientIdBox.Text.Trim();
             if (lowFireCheck != null)
                 settings.VisualLowFire = lowFireCheck.Checked;
             if (noBobberCheck != null)

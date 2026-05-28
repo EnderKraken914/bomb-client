@@ -1,6 +1,6 @@
 # Bomb Client
 
-Current version: `1.1.3`
+Current version: `1.1.4`
 
 Bomb Client is a Windows desktop launcher for Minecraft Bedrock with external PvP overlays. It launches Bedrock, draws optional click-through HUD windows above the game, and builds a visual-only Bedrock resource pack without editing the installed game.
 
@@ -47,15 +47,9 @@ Bedrock on Windows does not expose the same open per-version installation system
 
 ## Account
 
-The Account tab opens safe Microsoft sign-in surfaces:
+The Account tab includes a **Sign in with Microsoft** button that uses Microsoft's official device-code authentication flow. After the browser sign-in completes, Bomb Client reads the Microsoft Graph profile display name and email, then shows them in the Account tab.
 
-- Minecraft's own sign-in flow
-- Xbox app
-- Windows account settings
-- Minecraft and Microsoft account web pages
-- Microsoft Store
-
-Bomb Client does not collect, store, or handle your Microsoft password or tokens.
+Microsoft requires an OAuth app registration client ID before a desktop app can read profile data. Paste that Application (client) ID into the Account tab once, then use Sign in with Microsoft. Bomb Client does not collect, store, or handle your Microsoft password or account tokens; it stores only the display name, email, and connection time.
 
 ## External Overlay Limits
 
@@ -74,7 +68,7 @@ To reduce antivirus false positives, Bomb Client uses foreground-only input poll
 To force an update:
 
 1. Build a new `BombClient-Windows.zip`.
-2. Upload it to a versioned GitHub Release like `v1.1.3`.
+2. Upload it to a versioned GitHub Release like `v1.1.4`.
 3. Update `update.json` with the new `latest_version`, `required_version`, and Release asset URL.
 4. Commit and push the updated files.
 
