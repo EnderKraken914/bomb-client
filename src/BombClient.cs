@@ -19,8 +19,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("Bomb Client")]
 [assembly: AssemblyCompany("EnderKraken914")]
 [assembly: AssemblyCopyright("Copyright 2026")]
-[assembly: AssemblyVersion("1.1.5.0")]
-[assembly: AssemblyFileVersion("1.1.5.0")]
+[assembly: AssemblyVersion("1.1.6.0")]
+[assembly: AssemblyFileVersion("1.1.6.0")]
 
 namespace BombClient
 {
@@ -79,11 +79,11 @@ namespace BombClient
 
     internal static class AppInfo
     {
-        public const string Version = "1.1.5";
+        public const string Version = "1.1.6";
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
         public const string UpdateManifestUrl = "https://api.github.com/repos/EnderKraken914/bomb-client/contents/update.json?ref=main";
-        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.5/BombClient-Windows-1.1.5.zip";
+        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.6/BombClient-Windows-1.1.6.zip";
     }
 
     internal sealed class UpdateManifest
@@ -812,6 +812,12 @@ namespace BombClient
         private Button microsoftSignInButton;
         private Button accountPillButton;
         private readonly Dictionary<string, Button> pageButtons = new Dictionary<string, Button>(StringComparer.OrdinalIgnoreCase);
+        private Rectangle restoreBounds;
+        private Rectangle fullscreenRestoreBounds;
+        private bool hasRestoreBounds;
+        private bool isWindowedMaximized;
+        private bool isFullscreen;
+        private bool fullscreenRestoreWasMaximized;
         private TextBox serverHostBox;
         private NumericUpDown serverPortBox;
         private TrackBar opacityTrack;
@@ -853,6 +859,7 @@ namespace BombClient
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             StartPosition = FormStartPosition.CenterScreen;
             AutoScaleMode = AutoScaleMode.None;
+            KeyPreview = true;
             FormBorderStyle = FormBorderStyle.None;
             MinimumSize = new Size(1180, 680);
             Size = new Size(1180, 700);
@@ -932,7 +939,7 @@ namespace BombClient
 
             Button maximize = CreateIconButton("□", false);
             maximize.Location = new Point(1100, 26);
-            maximize.Click += delegate { WindowState = WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized; };
+            maximize.Click += delegate { ToggleWindowedMaximize(); };
             topBar.Controls.Add(maximize);
 
             Button minimize = CreateIconButton("_", false);
@@ -1006,8 +1013,76 @@ namespace BombClient
         {
             if (e.Button != MouseButtons.Left)
                 return;
+            if (isFullscreen)
+                return;
+            if (isWindowedMaximized)
+                RestoreFromWindowedMaximize();
             NativeMethods.ReleaseCapture();
             NativeMethods.SendMessage(Handle, NativeMethods.WM_NCLBUTTONDOWN, NativeMethods.HTCAPTION, 0);
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.F11)
+            {
+                ToggleFullscreen();
+                return true;
+            }
+            if (keyData == Keys.Escape && isFullscreen)
+            {
+                ToggleFullscreen();
+                return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void ToggleWindowedMaximize()
+        {
+            if (isFullscreen)
+                ToggleFullscreen();
+
+            if (isWindowedMaximized)
+            {
+                RestoreFromWindowedMaximize();
+                return;
+            }
+
+            if (WindowState == FormWindowState.Minimized)
+                WindowState = FormWindowState.Normal;
+
+            restoreBounds = Bounds;
+            hasRestoreBounds = true;
+            Rectangle working = Screen.FromControl(this).WorkingArea;
+            Bounds = working;
+            isWindowedMaximized = true;
+            TopMost = false;
+        }
+
+        private void RestoreFromWindowedMaximize()
+        {
+            if (hasRestoreBounds && restoreBounds.Width > 0 && restoreBounds.Height > 0)
+                Bounds = restoreBounds;
+            isWindowedMaximized = false;
+            TopMost = false;
+        }
+
+        private void ToggleFullscreen()
+        {
+            if (isFullscreen)
+            {
+                Bounds = fullscreenRestoreBounds;
+                isFullscreen = false;
+                isWindowedMaximized = fullscreenRestoreWasMaximized;
+                TopMost = false;
+                return;
+            }
+
+            fullscreenRestoreBounds = Bounds;
+            fullscreenRestoreWasMaximized = isWindowedMaximized;
+            isFullscreen = true;
+            isWindowedMaximized = false;
+            TopMost = true;
+            Bounds = Screen.FromControl(this).Bounds;
         }
 
         private void RegisterPageButton(string page, Button button)

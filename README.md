@@ -1,12 +1,14 @@
 # Bomb Client
 
-Current version: `1.1.5`
+Current version: `1.1.6`
 
 Bomb Client is a Windows desktop launcher for Minecraft Bedrock with external PvP overlays. It launches Bedrock, draws optional click-through HUD windows above the game, and builds a visual-only Bedrock resource pack without editing the installed game.
 
 ## UI
 
 Bomb Client uses a Feather-style dark launcher shell with a top Play/Mods/Visuals/Servers nav, a profile card button, settings button, and custom minimize/maximize/exit controls.
+
+The maximize button stretches the frameless launcher to the Windows working area, so the taskbar remains visible. Press `F11` for true fullscreen and press `F11` again or `Esc` to leave fullscreen.
 
 ## Run
 
@@ -72,7 +74,7 @@ To reduce antivirus false positives, Bomb Client uses foreground-only input poll
 To force an update:
 
 1. Build a new `BombClient-Windows.zip`.
-2. Upload it to a versioned GitHub Release like `v1.1.5`.
+2. Upload it to a versioned GitHub Release like `v1.1.6`.
 3. Update `update.json` with the new `latest_version`, `required_version`, and Release asset URL.
 4. Commit and push the updated files.
 
