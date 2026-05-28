@@ -19,8 +19,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("Bomb Client")]
 [assembly: AssemblyCompany("EnderKraken914")]
 [assembly: AssemblyCopyright("Copyright 2026")]
-[assembly: AssemblyVersion("1.1.1.0")]
-[assembly: AssemblyFileVersion("1.1.1.0")]
+[assembly: AssemblyVersion("1.1.2.0")]
+[assembly: AssemblyFileVersion("1.1.2.0")]
 
 namespace BombClient
 {
@@ -79,11 +79,11 @@ namespace BombClient
 
     internal static class AppInfo
     {
-        public const string Version = "1.1.1";
+        public const string Version = "1.1.2";
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
         public const string UpdateManifestUrl = "https://raw.githubusercontent.com/EnderKraken914/bomb-client/main/update.json";
-        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/raw/main/release/BombClient-Windows-1.1.1.zip";
+        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/raw/main/release/BombClient-Windows-1.1.2.zip";
     }
 
     internal sealed class UpdateManifest
@@ -626,6 +626,7 @@ namespace BombClient
 
             PictureBox logo = new PictureBox();
             logo.Image = AssetLoader.LoadLogo();
+            logo.BackColor = header.BackColor;
             logo.SizeMode = PictureBoxSizeMode.Zoom;
             logo.Location = new Point(22, 12);
             logo.Size = new Size(72, 72);
