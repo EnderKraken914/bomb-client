@@ -1,6 +1,6 @@
 # Bomb Client
 
-Current version: `1.1.2`
+Current version: `1.1.3`
 
 Bomb Client is a Windows desktop launcher for Minecraft Bedrock with external PvP overlays. It launches Bedrock, draws optional click-through HUD windows above the game, and builds a visual-only Bedrock resource pack without editing the installed game.
 
@@ -67,15 +67,15 @@ Bomb Client checks this repository's `update.json` on startup:
 
 `https://api.github.com/repos/EnderKraken914/bomb-client/contents/update.json?ref=main`
 
-When `required_version` is higher than the installed app version and `force_update` is `true`, players must update before the launcher opens. The app opens the public download URL for the versioned zip in `release/` and exits instead of replacing its own executable.
+When `required_version` is higher than the installed app version and `force_update` is `true`, players must update before the launcher opens. The app opens the public download URL for the versioned zip attached to the GitHub Release and exits instead of replacing its own executable.
 
 To reduce antivirus false positives, Bomb Client uses foreground-only input polling for CPS/keystrokes instead of global keyboard or mouse hooks, and it does not run a self-updating installer script.
 
 To force an update:
 
 1. Build a new `BombClient-Windows.zip`.
-2. Copy it to a versioned file like `release/BombClient-Windows-1.1.2.zip`.
-3. Update `update.json` with the new `latest_version` and `required_version`.
+2. Upload it to a versioned GitHub Release like `v1.1.3`.
+3. Update `update.json` with the new `latest_version`, `required_version`, and Release asset URL.
 4. Commit and push the updated files.
 
 ## Visual pack

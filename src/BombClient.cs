@@ -19,8 +19,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("Bomb Client")]
 [assembly: AssemblyCompany("EnderKraken914")]
 [assembly: AssemblyCopyright("Copyright 2026")]
-[assembly: AssemblyVersion("1.1.2.0")]
-[assembly: AssemblyFileVersion("1.1.2.0")]
+[assembly: AssemblyVersion("1.1.3.0")]
+[assembly: AssemblyFileVersion("1.1.3.0")]
 
 namespace BombClient
 {
@@ -79,11 +79,11 @@ namespace BombClient
 
     internal static class AppInfo
     {
-        public const string Version = "1.1.2";
+        public const string Version = "1.1.3";
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
         public const string UpdateManifestUrl = "https://api.github.com/repos/EnderKraken914/bomb-client/contents/update.json?ref=main";
-        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/raw/main/release/BombClient-Windows-1.1.2.zip";
+        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.3/BombClient-Windows-1.1.3.zip";
     }
 
     internal sealed class UpdateManifest

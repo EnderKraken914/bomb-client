@@ -1,8 +1,8 @@
 {
-  "latest_version": "1.1.2",
-  "required_version": "1.1.2",
+  "latest_version": "1.1.3",
+  "required_version": "1.1.3",
   "force_update": true,
-  "download_url": "https://github.com/EnderKraken914/bomb-client/raw/main/release/BombClient-Windows-1.1.2.zip",
-  "release_page": "https://github.com/EnderKraken914/bomb-client/releases/latest",
-  "notes": "Trims the Bomb Client logo white background and regenerates the app icon."
+  "download_url": "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.3/BombClient-Windows-1.1.3.zip",
+  "release_page": "https://github.com/EnderKraken914/bomb-client/releases/tag/v1.1.3",
+  "notes": "Moves the Windows download to a GitHub Release asset and removes old raw zip downloads."
 }

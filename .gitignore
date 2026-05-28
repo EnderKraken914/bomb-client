@@ -5,8 +5,6 @@ build/
 *.tmp
 *.log
 *.zip
-!release/
-!release/*.zip
 *.mcpack
 *.pdb
 *.cache
