@@ -65,7 +65,7 @@ Bomb Client does not inject into Bedrock or read game memory. Live armor durabil
 
 Bomb Client checks this repository's `update.json` on startup:
 
-`https://raw.githubusercontent.com/EnderKraken914/bomb-client/main/update.json`
+`https://api.github.com/repos/EnderKraken914/bomb-client/contents/update.json?ref=main`
 
 When `required_version` is higher than the installed app version and `force_update` is `true`, players must update before the launcher opens. The app opens the public download URL for the versioned zip in `release/` and exits instead of replacing its own executable.
 

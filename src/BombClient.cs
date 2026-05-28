@@ -82,7 +82,7 @@ namespace BombClient
         public const string Version = "1.1.2";
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
-        public const string UpdateManifestUrl = "https://raw.githubusercontent.com/EnderKraken914/bomb-client/main/update.json";
+        public const string UpdateManifestUrl = "https://api.github.com/repos/EnderKraken914/bomb-client/contents/update.json?ref=main";
         public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/raw/main/release/BombClient-Windows-1.1.2.zip";
     }
 
@@ -166,6 +166,7 @@ namespace BombClient
                 using (TimeoutWebClient client = new TimeoutWebClient(5000))
                 {
                     client.Headers.Add("User-Agent", "BombClient/" + AppInfo.Version);
+                    client.Headers.Add("Accept", "application/vnd.github.raw+json");
                     client.CachePolicy = new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.NoCacheNoStore);
                     string json = client.DownloadString(AppInfo.UpdateManifestUrl);
                     return ParseManifest(json);
