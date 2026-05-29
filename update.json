@@ -1,8 +1,8 @@
 {
-  "latest_version": "1.1.7",
-  "required_version": "1.1.7",
+  "latest_version": "1.1.8",
+  "required_version": "1.1.8",
   "force_update": true,
-  "download_url": "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.7/BombClient-Windows-1.1.7.zip",
-  "release_page": "https://github.com/EnderKraken914/bomb-client/releases/tag/v1.1.7",
-  "notes": "Adds consistent spacing between the top-right profile, settings, window, minimize, and close icons."
+  "download_url": "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.8/BombClient-Windows-1.1.8.zip",
+  "release_page": "https://github.com/EnderKraken914/bomb-client/releases/tag/v1.1.8",
+  "notes": "Moves PvP visuals into Bomb Client's external visual layer instead of building a Bedrock resource pack."
 }

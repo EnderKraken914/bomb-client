@@ -19,8 +19,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("Bomb Client")]
 [assembly: AssemblyCompany("EnderKraken914")]
 [assembly: AssemblyCopyright("Copyright 2026")]
-[assembly: AssemblyVersion("1.1.7.0")]
-[assembly: AssemblyFileVersion("1.1.7.0")]
+[assembly: AssemblyVersion("1.1.8.0")]
+[assembly: AssemblyFileVersion("1.1.8.0")]
 
 namespace BombClient
 {
@@ -34,9 +34,8 @@ namespace BombClient
 
             if (args.Length > 0 && string.Equals(args[0], "--self-test", StringComparison.OrdinalIgnoreCase))
             {
-                AppSettings settings = AppSettings.Load();
-                string pack = ResourcePackBuilder.Build(settings);
-                return File.Exists(pack) ? 0 : 2;
+                AppSettings.Load();
+                return OverlayCatalog.Find("clientvisuals") == null ? 2 : 0;
             }
 
             if (!UpdateChecker.EnforceRequiredUpdate())
@@ -79,11 +78,11 @@ namespace BombClient
 
     internal static class AppInfo
     {
-        public const string Version = "1.1.7";
+        public const string Version = "1.1.8";
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
         public const string UpdateManifestUrl = "https://api.github.com/repos/EnderKraken914/bomb-client/contents/update.json?ref=main";
-        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.7/BombClient-Windows-1.1.7.zip";
+        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.8/BombClient-Windows-1.1.8.zip";
     }
 
     internal sealed class UpdateManifest
@@ -1240,17 +1239,17 @@ namespace BombClient
             };
             quickCard.Controls.Add(stopOverlays);
 
-            Button buildPack = CreateSecondaryButton("Build Pack");
-            buildPack.Location = new Point(22, 114);
-            buildPack.Size = new Size(136, 40);
-            buildPack.Click += delegate { BuildPack(false); };
-            quickCard.Controls.Add(buildPack);
+            Button applyVisuals = CreateSecondaryButton("Apply Visuals");
+            applyVisuals.Location = new Point(22, 114);
+            applyVisuals.Size = new Size(136, 40);
+            applyVisuals.Click += delegate { ApplyClientVisuals(true); };
+            quickCard.Controls.Add(applyVisuals);
 
-            Button importPack = CreateSecondaryButton("Import Pack");
-            importPack.Location = new Point(174, 114);
-            importPack.Size = new Size(136, 40);
-            importPack.Click += delegate { BuildPack(true); };
-            quickCard.Controls.Add(importPack);
+            Button visualSettings = CreateSecondaryButton("Visuals");
+            visualSettings.Location = new Point(174, 114);
+            visualSettings.Size = new Size(136, 40);
+            visualSettings.Click += delegate { ShowPage("Visual"); };
+            quickCard.Controls.Add(visualSettings);
 
             minecraftLabel = CreateMutedLabel("Minecraft status");
             minecraftLabel.Location = new Point(22, 168);
@@ -1811,108 +1810,108 @@ namespace BombClient
         {
             Panel page = CreatePage();
             page.AutoScroll = true;
-            Label heading = CreateHeading("Visual Pack");
+            Label heading = CreateHeading("Client Visuals");
             heading.Location = new Point(0, 0);
             page.Controls.Add(heading);
 
-            Panel card = CreateCard(0, 54, 720, 560);
+            Panel card = CreateCard(0, 54, 720, 590);
             page.Controls.Add(card);
-            Label title = CreateCardTitle("Bomb Client PvP Pack");
+            Label title = CreateCardTitle("Bomb Client Visual Layer");
             title.Location = new Point(20, 18);
             card.Controls.Add(title);
 
+            Label note = CreateMutedLabel("Server-safe external visuals drawn by Bomb Client itself. No .mcpack or server resource-pack slot is used.");
+            note.Location = new Point(22, 48);
+            note.Size = new Size(650, 34);
+            card.Controls.Add(note);
+
             lowFireCheck = CreateCheck("Low fire", settings.VisualLowFire);
-            lowFireCheck.Location = new Point(22, 62);
+            lowFireCheck.Location = new Point(22, 94);
             card.Controls.Add(lowFireCheck);
 
-            noBobberCheck = CreateCheck("No bobber", settings.VisualNoBobber);
-            noBobberCheck.Location = new Point(22, 102);
+            noBobberCheck = CreateCheck("No bobber marker", settings.VisualNoBobber);
+            noBobberCheck.Location = new Point(22, 134);
             card.Controls.Add(noBobberCheck);
 
             lowShieldCheck = CreateCheck("Low shield", settings.VisualLowShield);
-            lowShieldCheck.Location = new Point(22, 142);
+            lowShieldCheck.Location = new Point(22, 174);
             card.Controls.Add(lowShieldCheck);
 
             smallTotemCheck = CreateCheck("Small totem", settings.VisualSmallTotem);
-            smallTotemCheck.Location = new Point(22, 182);
+            smallTotemCheck.Location = new Point(22, 214);
             card.Controls.Add(smallTotemCheck);
 
             smallTotemPopCheck = CreateCheck("Small totem pop", settings.VisualSmallTotemPop);
-            smallTotemPopCheck.Location = new Point(22, 222);
+            smallTotemPopCheck.Location = new Point(22, 254);
             card.Controls.Add(smallTotemPopCheck);
 
-            cleanPumpkinCheck = CreateCheck("Clean pumpkin", settings.VisualCleanPumpkin);
-            cleanPumpkinCheck.Location = new Point(300, 62);
+            cleanPumpkinCheck = CreateCheck("Clean pumpkin frame", settings.VisualCleanPumpkin);
+            cleanPumpkinCheck.Location = new Point(300, 94);
             card.Controls.Add(cleanPumpkinCheck);
 
-            clearVignetteCheck = CreateCheck("Clear vignette", settings.VisualClearVignette);
-            clearVignetteCheck.Location = new Point(300, 102);
+            clearVignetteCheck = CreateCheck("Clear vignette guard", settings.VisualClearVignette);
+            clearVignetteCheck.Location = new Point(300, 134);
             card.Controls.Add(clearVignetteCheck);
 
             Label sizeTitle = CreateCardTitle("Visual Sizes");
-            sizeTitle.Location = new Point(20, 284);
+            sizeTitle.Location = new Point(20, 304);
             card.Controls.Add(sizeTitle);
 
             Label shieldLabel = CreateMutedLabel("Shield");
-            shieldLabel.Location = new Point(24, 318);
+            shieldLabel.Location = new Point(24, 338);
             shieldLabel.Size = new Size(110, 20);
             card.Controls.Add(shieldLabel);
             shieldSizeTrack = CreatePercentTrack(settings.VisualShieldSize);
-            shieldSizeTrack.Location = new Point(22, 340);
+            shieldSizeTrack.Location = new Point(22, 360);
             shieldSizeTrack.Scroll += delegate { settings.VisualShieldSize = shieldSizeTrack.Value; shieldSizeLabel.Text = settings.VisualShieldSize.ToString() + "%"; };
             card.Controls.Add(shieldSizeTrack);
             shieldSizeLabel = CreateMutedLabel(settings.VisualShieldSize.ToString() + "%");
-            shieldSizeLabel.Location = new Point(400, 342);
+            shieldSizeLabel.Location = new Point(400, 362);
             shieldSizeLabel.Size = new Size(80, 20);
             card.Controls.Add(shieldSizeLabel);
 
             Label totemLabel = CreateMutedLabel("Totem item");
-            totemLabel.Location = new Point(24, 378);
+            totemLabel.Location = new Point(24, 398);
             totemLabel.Size = new Size(140, 20);
             card.Controls.Add(totemLabel);
             totemSizeTrack = CreatePercentTrack(settings.VisualTotemSize);
-            totemSizeTrack.Location = new Point(22, 400);
+            totemSizeTrack.Location = new Point(22, 420);
             totemSizeTrack.Scroll += delegate { settings.VisualTotemSize = totemSizeTrack.Value; totemSizeLabel.Text = settings.VisualTotemSize.ToString() + "%"; };
             card.Controls.Add(totemSizeTrack);
             totemSizeLabel = CreateMutedLabel(settings.VisualTotemSize.ToString() + "%");
-            totemSizeLabel.Location = new Point(400, 402);
+            totemSizeLabel.Location = new Point(400, 422);
             totemSizeLabel.Size = new Size(80, 20);
             card.Controls.Add(totemSizeLabel);
 
             Label popLabel = CreateMutedLabel("Totem pop");
-            popLabel.Location = new Point(24, 438);
+            popLabel.Location = new Point(24, 458);
             popLabel.Size = new Size(140, 20);
             card.Controls.Add(popLabel);
             totemPopSizeTrack = CreatePercentTrack(settings.VisualTotemPopSize);
-            totemPopSizeTrack.Location = new Point(22, 460);
+            totemPopSizeTrack.Location = new Point(22, 480);
             totemPopSizeTrack.Scroll += delegate { settings.VisualTotemPopSize = totemPopSizeTrack.Value; totemPopSizeLabel.Text = settings.VisualTotemPopSize.ToString() + "%"; };
             card.Controls.Add(totemPopSizeTrack);
             totemPopSizeLabel = CreateMutedLabel(settings.VisualTotemPopSize.ToString() + "%");
-            totemPopSizeLabel.Location = new Point(400, 462);
+            totemPopSizeLabel.Location = new Point(400, 482);
             totemPopSizeLabel.Size = new Size(80, 20);
             card.Controls.Add(totemPopSizeLabel);
 
-            Button build = CreatePrimaryButton("Build .mcpack");
-            build.Location = new Point(22, 504);
-            build.Size = new Size(150, 42);
-            build.Click += delegate { BuildPack(false); };
-            card.Controls.Add(build);
+            Button apply = CreatePrimaryButton("Apply Client Visuals");
+            apply.Location = new Point(22, 520);
+            apply.Size = new Size(190, 42);
+            apply.Click += delegate { ApplyClientVisuals(true); };
+            card.Controls.Add(apply);
 
-            Button import = CreateSecondaryButton("Build and Import");
-            import.Location = new Point(190, 504);
-            import.Size = new Size(158, 42);
-            import.Click += delegate { BuildPack(true); };
-            card.Controls.Add(import);
+            Button stop = CreateSecondaryButton("Stop Visuals");
+            stop.Location = new Point(230, 520);
+            stop.Size = new Size(140, 42);
+            stop.Click += delegate { ApplyClientVisuals(false); };
+            card.Controls.Add(stop);
 
-            Button openPacks = CreateSecondaryButton("Open Pack Folder");
-            openPacks.Location = new Point(366, 504);
-            openPacks.Size = new Size(150, 42);
-            openPacks.Click += delegate
-            {
-                Directory.CreateDirectory(AppPaths.PackRoot);
-                Process.Start(AppPaths.PackRoot);
-            };
-            card.Controls.Add(openPacks);
+            Label limit = CreateMutedLabel("External visuals can draw over Bedrock, but cannot erase Bedrock pixels or replace item models without game hooks.");
+            limit.Location = new Point(388, 520);
+            limit.Size = new Size(300, 42);
+            card.Controls.Add(limit);
 
             return page;
         }
@@ -2267,22 +2266,14 @@ namespace BombClient
                 MessageBox.Show(profile.Name + " package folder was not found.", "Bomb Client", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        private void BuildPack(bool importAfterBuild)
+        private void ApplyClientVisuals(bool enabled)
         {
-            try
-            {
-                PersistSettingsFromUi();
-                string pack = ResourcePackBuilder.Build(settings);
-                SetStatus("Pack built: " + pack);
-                if (importAfterBuild)
-                    Process.Start(pack);
-                else
-                    Process.Start("explorer.exe", "/select,\"" + pack + "\"");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Pack build failed.\n\n" + ex.Message, "Bomb Client", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            PersistSettingsFromUi();
+            settings.Overlays["clientvisuals"] = enabled;
+            settings.Save();
+            OverlayManager.Configure(settings);
+            OverlayManager.SetOverlay("clientvisuals", enabled);
+            SetStatus(enabled ? "Client visual layer enabled." : "Client visual layer stopped.");
         }
 
         private void UpdateMinecraftStatus()
@@ -2482,6 +2473,7 @@ namespace BombClient
             new OverlayDefinition("keystrokes", "Keystrokes", "WASD, jump, sneak, and mouse button input display.", true, 22, 154),
             new OverlayDefinition("combo", "Combo", "Click streak counter for PvP practice.", false, 22, 330),
             new OverlayDefinition("crosshair", "Crosshair", "Simple external center-screen crosshair.", false, 0, 0),
+            new OverlayDefinition("clientvisuals", "Client Visuals", "Server-safe Bomb Client visual layer, no resource pack required.", true, 0, 0),
             new OverlayDefinition("clock", "Clock", "Compact local time display.", false, 22, 378),
             new OverlayDefinition("session", "Session Timer", "Timer for your current Bomb Client session.", false, 22, 420),
             new OverlayDefinition("memory", "Minecraft RAM", "Memory usage for the Bedrock process when it is running.", true, 22, 462),
@@ -2559,7 +2551,7 @@ namespace BombClient
             if (!settings.Positions.TryGetValue(id, out pos))
                 pos = def.DefaultPosition;
 
-            if (id == "crosshair")
+            if (id == "crosshair" || id == "clientvisuals")
             {
                 form.Bounds = Screen.PrimaryScreen.Bounds;
             }
@@ -2673,6 +2665,8 @@ namespace BombClient
                 return new TextOverlayForm(id, 122, 36, delegate { return "COMBO " + InputTracker.ComboCount.ToString(); });
             if (id == "crosshair")
                 return new CrosshairOverlayForm(id);
+            if (id == "clientvisuals")
+                return new ClientVisualsOverlayForm(id, settings);
             if (id == "clock")
                 return new TextOverlayForm(id, 130, 36, delegate { return DateTime.Now.ToString("h:mm:ss tt"); });
             if (id == "session")
@@ -3005,6 +2999,162 @@ namespace BombClient
                 e.Graphics.DrawLine(hot, cx, cy + 4, cx, cy + 12);
             }
             base.OnPaint(e);
+        }
+    }
+
+    internal sealed class ClientVisualsOverlayForm : BaseOverlayForm
+    {
+        private readonly AppSettings settings;
+
+        public ClientVisualsOverlayForm(string moduleId, AppSettings appSettings)
+            : base(moduleId, Screen.PrimaryScreen.Bounds.Width, Screen.PrimaryScreen.Bounds.Height)
+        {
+            settings = appSettings;
+            Timer.Interval = 60;
+        }
+
+        public override void SetScale(int percent)
+        {
+            ScalePercent = Math.Max(60, Math.Min(180, percent));
+            Bounds = Screen.PrimaryScreen.Bounds;
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            if (settings.VisualLowFire)
+                DrawLowFireCover(g);
+            if (settings.VisualCleanPumpkin || settings.VisualClearVignette)
+                DrawCleanScreenFrame(g);
+            if (settings.VisualLowShield)
+                DrawShieldMarker(g);
+            if (settings.VisualSmallTotem)
+                DrawTotemMarker(g, false);
+            if (settings.VisualSmallTotemPop)
+                DrawTotemMarker(g, true);
+            if (settings.VisualNoBobber)
+                DrawNoBobberMarker(g);
+
+            if (EditMode)
+            {
+                using (Pen pen = new Pen(Color.FromArgb(190, 255, 164, 58), 2f))
+                    g.DrawRectangle(pen, 8, 8, Width - 17, Height - 17);
+                using (Font font = new Font("Segoe UI Semibold", 11f, FontStyle.Bold))
+                    TextRenderer.DrawText(g, "Bomb Client visual layer", font, new Rectangle(18, 16, 260, 28), Color.FromArgb(255, 164, 58));
+            }
+
+            base.OnPaint(e);
+        }
+
+        private void DrawLowFireCover(Graphics g)
+        {
+            int coverHeight = Math.Max(48, Height / 9);
+            Rectangle cover = new Rectangle(0, Height - coverHeight, Width, coverHeight);
+            using (LinearGradientBrush brush = new LinearGradientBrush(cover, Color.FromArgb(0, 0, 0, 0), Color.FromArgb(210, 2, 5, 8), LinearGradientMode.Vertical))
+                g.FillRectangle(brush, cover);
+
+            int flameBase = Height - S(22);
+            int flameTop = Height - Math.Max(S(54), coverHeight / 2);
+            int flameWidth = S(18);
+            int spacing = S(28);
+            int start = Width / 2 - spacing * 5;
+            using (SolidBrush redBrush = new SolidBrush(Color.FromArgb(120, 230, 44, 30)))
+            using (SolidBrush orangeBrush = new SolidBrush(Color.FromArgb(105, 255, 142, 36)))
+            {
+                for (int i = 0; i < 11; i++)
+                {
+                    int x = start + i * spacing;
+                    Point[] flame = new Point[]
+                    {
+                        new Point(x, flameBase),
+                        new Point(x + flameWidth / 2, flameTop + (i % 3) * S(5)),
+                        new Point(x + flameWidth, flameBase)
+                    };
+                    g.FillPolygon(i % 2 == 0 ? orangeBrush : redBrush, flame);
+                }
+            }
+        }
+
+        private void DrawCleanScreenFrame(Graphics g)
+        {
+            using (Pen frame = new Pen(Color.FromArgb(55, 255, 255, 255), S(2)))
+            {
+                g.DrawLine(frame, S(22), S(22), Width - S(22), S(22));
+                g.DrawLine(frame, S(22), Height - S(22), Width - S(22), Height - S(22));
+            }
+        }
+
+        private void DrawShieldMarker(Graphics g)
+        {
+            int size = Math.Max(S(34), S(settings.VisualShieldSize));
+            int x = S(42);
+            int y = Height - size - S(42);
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                path.AddPolygon(new Point[]
+                {
+                    new Point(x + size / 2, y),
+                    new Point(x + size, y + size / 5),
+                    new Point(x + size - size / 7, y + size - size / 8),
+                    new Point(x + size / 2, y + size),
+                    new Point(x + size / 7, y + size - size / 8),
+                    new Point(x, y + size / 5)
+                });
+                using (SolidBrush brush = new SolidBrush(Color.FromArgb(92, 120, 92, 62)))
+                using (Pen pen = new Pen(Color.FromArgb(130, 220, 190, 130), S(2)))
+                {
+                    g.FillPath(brush, path);
+                    g.DrawPath(pen, path);
+                }
+            }
+        }
+
+        private void DrawTotemMarker(Graphics g, bool pop)
+        {
+            int sizeSetting = pop ? settings.VisualTotemPopSize : settings.VisualTotemSize;
+            int size = Math.Max(S(28), S(sizeSetting));
+            int x = Width - size - S(pop ? 118 : 58);
+            int y = Height - size - S(pop ? 104 : 48);
+
+            if (pop)
+            {
+                using (Pen ray = new Pen(Color.FromArgb(125, 255, 231, 95), S(3)))
+                {
+                    int cx = x + size / 2;
+                    int cy = y + size / 2;
+                    g.DrawLine(ray, cx, cy - size / 2 - S(18), cx, cy - size / 2);
+                    g.DrawLine(ray, cx + size / 2, cy, cx + size / 2 + S(18), cy);
+                    g.DrawLine(ray, cx - size / 2, cy, cx - size / 2 - S(18), cy);
+                }
+            }
+
+            using (SolidBrush gold = new SolidBrush(Color.FromArgb(150, 245, 226, 83)))
+            using (SolidBrush green = new SolidBrush(Color.FromArgb(135, 74, 190, 111)))
+            using (Pen edge = new Pen(Color.FromArgb(150, 64, 88, 38), S(2)))
+            {
+                Rectangle body = new Rectangle(x + size / 3, y + size / 4, size / 3, size / 2);
+                Rectangle head = new Rectangle(x + size / 3, y, size / 3, size / 4);
+                g.FillRectangle(gold, head);
+                g.FillRectangle(gold, body);
+                g.FillRectangle(green, x + size / 8, y + size / 3, size / 4, size / 4);
+                g.FillRectangle(green, x + size - size / 3, y + size / 3, size / 4, size / 4);
+                g.DrawRectangle(edge, x + size / 4, y, size / 2, size - 1);
+            }
+        }
+
+        private void DrawNoBobberMarker(Graphics g)
+        {
+            int x = Width - S(92);
+            int y = S(118);
+            using (Pen line = new Pen(Color.FromArgb(150, 245, 62, 62), S(3)))
+            using (SolidBrush dot = new SolidBrush(Color.FromArgb(110, 245, 245, 245)))
+            {
+                g.FillEllipse(dot, x, y, S(18), S(18));
+                g.DrawLine(line, x - S(4), y + S(22), x + S(24), y - S(6));
+            }
         }
     }
 
