@@ -19,8 +19,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("Bomb Client")]
 [assembly: AssemblyCompany("EnderKraken914")]
 [assembly: AssemblyCopyright("Copyright 2026")]
-[assembly: AssemblyVersion("1.1.6.0")]
-[assembly: AssemblyFileVersion("1.1.6.0")]
+[assembly: AssemblyVersion("1.1.7.0")]
+[assembly: AssemblyFileVersion("1.1.7.0")]
 
 namespace BombClient
 {
@@ -79,11 +79,11 @@ namespace BombClient
 
     internal static class AppInfo
     {
-        public const string Version = "1.1.6";
+        public const string Version = "1.1.7";
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
         public const string UpdateManifestUrl = "https://api.github.com/repos/EnderKraken914/bomb-client/contents/update.json?ref=main";
-        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.6/BombClient-Windows-1.1.6.zip";
+        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.7/BombClient-Windows-1.1.7.zip";
     }
 
     internal sealed class UpdateManifest
@@ -952,16 +952,24 @@ namespace BombClient
             close.Click += delegate { Close(); };
             topBar.Controls.Add(close);
 
-            topBar.Resize += delegate
+            Action layoutTopBarControls = delegate
             {
-                navStrip.Left = Math.Max(260, (topBar.Width - navStrip.Width) / 2);
-                close.Left = topBar.Width - 52;
-                minimize.Left = close.Left - 42;
-                maximize.Left = minimize.Left - 42;
-                settingsIcon.Left = maximize.Left - 42;
-                profileIcon.Left = settingsIcon.Left - 42;
-                accountPillButton.Left = profileIcon.Left - accountPillButton.Width - 12;
+                const int rightMargin = 26;
+                const int iconGap = 14;
+                const int accountGap = 18;
+                close.Left = topBar.Width - rightMargin - close.Width;
+                minimize.Left = close.Left - iconGap - minimize.Width;
+                maximize.Left = minimize.Left - iconGap - maximize.Width;
+                settingsIcon.Left = maximize.Left - iconGap - settingsIcon.Width;
+                profileIcon.Left = settingsIcon.Left - iconGap - profileIcon.Width;
+                accountPillButton.Left = profileIcon.Left - accountGap - accountPillButton.Width;
+
+                int centeredNav = (topBar.Width - navStrip.Width) / 2;
+                int maxNavLeft = accountPillButton.Left - navStrip.Width - accountGap;
+                navStrip.Left = Math.Max(260, Math.Min(centeredNav, maxNavLeft));
             };
+            topBar.Resize += delegate { layoutTopBarControls(); };
+            layoutTopBarControls();
 
             Panel content = new Panel();
             content.Dock = DockStyle.Fill;
@@ -1124,7 +1132,7 @@ namespace BombClient
         {
             Button button = new Button();
             button.Text = label;
-            button.Size = new Size(34, 34);
+            button.Size = new Size(38, 36);
             button.FlatStyle = FlatStyle.Flat;
             button.FlatAppearance.BorderSize = 0;
             button.BackColor = danger ? Color.FromArgb(42, 12, 17) : Color.FromArgb(14, 19, 27);

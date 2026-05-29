@@ -1,8 +1,8 @@
 {
-  "latest_version": "1.1.6",
-  "required_version": "1.1.6",
+  "latest_version": "1.1.7",
+  "required_version": "1.1.7",
   "force_update": true,
-  "download_url": "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.6/BombClient-Windows-1.1.6.zip",
-  "release_page": "https://github.com/EnderKraken914/bomb-client/releases/tag/v1.1.6",
-  "notes": "Fixes maximize for the frameless launcher so it stays windowed above the taskbar, and adds F11 true fullscreen."
+  "download_url": "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.7/BombClient-Windows-1.1.7.zip",
+  "release_page": "https://github.com/EnderKraken914/bomb-client/releases/tag/v1.1.7",
+  "notes": "Adds consistent spacing between the top-right profile, settings, window, minimize, and close icons."
 }
