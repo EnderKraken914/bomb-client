@@ -1,8 +1,12 @@
 {
-  "latest_version": "1.1.8",
-  "required_version": "1.1.8",
+  "latest_version": "2.0.0",
+  "required_version": "2.0.0",
   "force_update": true,
-  "download_url": "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.8/BombClient-Windows-1.1.8.zip",
-  "release_page": "https://github.com/EnderKraken914/bomb-client/releases/tag/v1.1.8",
-  "notes": "Moves PvP visuals into Bomb Client's external visual layer instead of building a Bedrock resource pack."
+  "release_date": "2026-05-29",
+  "release_title": "Bomb Client 2.0 Core",
+  "changelog": "New module architecture, server profile manager, pack manager, optional Bomb Server Bridge foundation, upgraded overlay data context, Latest Updates tab, and safer 2.x release workflow. Bomb Client remains external only: no injection, hooks, memory editing, packet manipulation, traffic modification, or installed Bedrock file edits.",
+  "github_release_url": "https://github.com/EnderKraken914/bomb-client/releases/tag/v2.0.0",
+  "release_page": "https://github.com/EnderKraken914/bomb-client/releases/tag/v2.0.0",
+  "download_url": "https://github.com/EnderKraken914/bomb-client/releases/download/v2.0.0/BombClient-Windows-2.0.0.zip",
+  "notes": "Bomb Client 2.0 Core is a required update with modules, server profiles, packs, bridge mock mode, and update hub support."
 }

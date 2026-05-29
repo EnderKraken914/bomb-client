@@ -19,8 +19,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("Bomb Client")]
 [assembly: AssemblyCompany("EnderKraken914")]
 [assembly: AssemblyCopyright("Copyright 2026")]
-[assembly: AssemblyVersion("1.1.8.0")]
-[assembly: AssemblyFileVersion("1.1.8.0")]
+[assembly: AssemblyVersion("2.0.0.0")]
+[assembly: AssemblyFileVersion("2.0.0.0")]
 
 namespace BombClient
 {
@@ -34,8 +34,7 @@ namespace BombClient
 
             if (args.Length > 0 && string.Equals(args[0], "--self-test", StringComparison.OrdinalIgnoreCase))
             {
-                AppSettings.Load();
-                return OverlayCatalog.Find("clientvisuals") == null ? 2 : 0;
+                return SelfTestRunner.Run();
             }
 
             if (!UpdateChecker.EnforceRequiredUpdate())
@@ -78,11 +77,11 @@ namespace BombClient
 
     internal static class AppInfo
     {
-        public const string Version = "1.1.8";
+        public const string Version = "2.0.0";
         public const string RepoOwner = "EnderKraken914";
         public const string RepoName = "bomb-client";
         public const string UpdateManifestUrl = "https://api.github.com/repos/EnderKraken914/bomb-client/contents/update.json?ref=main";
-        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v1.1.8/BombClient-Windows-1.1.8.zip";
+        public const string ReleaseDownloadUrl = "https://github.com/EnderKraken914/bomb-client/releases/download/v2.0.0/BombClient-Windows-2.0.0.zip";
     }
 
     internal sealed class UpdateManifest
@@ -92,6 +91,9 @@ namespace BombClient
         public string DownloadUrl = AppInfo.ReleaseDownloadUrl;
         public string ReleasePage = "https://github.com/" + AppInfo.RepoOwner + "/" + AppInfo.RepoName + "/releases/latest";
         public string Notes = "";
+        public string ReleaseDate = "";
+        public string ReleaseTitle = "";
+        public string Changelog = "";
         public bool ForceUpdate = true;
 
         public bool RequiresUpdate()
@@ -157,7 +159,7 @@ namespace BombClient
             return true;
         }
 
-        private static UpdateManifest FetchManifest()
+        public static UpdateManifest FetchManifest()
         {
             try
             {
@@ -177,15 +179,21 @@ namespace BombClient
             }
         }
 
-        private static UpdateManifest ParseManifest(string json)
+        public static UpdateManifest ParseManifest(string json)
         {
             UpdateManifest manifest = new UpdateManifest();
             manifest.LatestVersion = ReadJsonString(json, "latest_version", manifest.LatestVersion);
             manifest.RequiredVersion = ReadJsonString(json, "required_version", manifest.RequiredVersion);
             manifest.DownloadUrl = ReadJsonString(json, "download_url", manifest.DownloadUrl);
             manifest.ReleasePage = ReadJsonString(json, "release_page", manifest.ReleasePage);
+            manifest.ReleasePage = ReadJsonString(json, "github_release_url", manifest.ReleasePage);
             manifest.Notes = ReadJsonString(json, "notes", manifest.Notes);
+            manifest.ReleaseDate = ReadJsonString(json, "release_date", manifest.ReleaseDate);
+            manifest.ReleaseTitle = ReadJsonString(json, "release_title", manifest.ReleaseTitle);
+            manifest.Changelog = ReadJsonString(json, "changelog", manifest.Changelog);
             manifest.ForceUpdate = ReadJsonBool(json, "force_update", manifest.ForceUpdate);
+            if (manifest.Notes.Length == 0)
+                manifest.Notes = manifest.Changelog;
             return manifest;
         }
 
@@ -797,9 +805,14 @@ namespace BombClient
     internal sealed class MainForm : Form
     {
         private readonly AppSettings settings;
+        private readonly Dictionary<string, ClientModuleState> moduleStates;
+        private List<ServerProfile> serverProfiles;
+        private List<ManagedPack> managedPacks;
         private readonly Dictionary<string, Button> toggleButtons = new Dictionary<string, Button>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Panel> pages = new Dictionary<string, Panel>(StringComparer.OrdinalIgnoreCase);
         private FlowLayoutPanel overlayFlow;
+        private TextBox moduleSearchBox;
+        private ComboBox moduleCategoryBox;
         private Label statusLabel;
         private Label minecraftLabel;
         private ComboBox launchProfileBox;
@@ -819,6 +832,26 @@ namespace BombClient
         private bool fullscreenRestoreWasMaximized;
         private TextBox serverHostBox;
         private NumericUpDown serverPortBox;
+        private ListBox serverProfileList;
+        private TextBox serverProfileNameBox;
+        private TextBox serverProfileHostBox;
+        private NumericUpDown serverProfilePortBox;
+        private ComboBox serverProfileCategoryBox;
+        private CheckBox serverProfileFavoriteCheck;
+        private TextBox serverProfileNotesBox;
+        private TextBox serverProfilePacksBox;
+        private Label serverProfileStatusLabel;
+        private ListBox managedPackList;
+        private TextBox bridgeUrlBox;
+        private CheckBox bridgeEnabledCheck;
+        private CheckBox bridgeMockCheck;
+        private Label bridgeStatusLabel;
+        private Label latestInstalledLabel;
+        private Label latestAvailableLabel;
+        private Label latestStatusLabel;
+        private Label latestReleaseDateLabel;
+        private TextBox latestChangelogBox;
+        private string latestReleaseUrl = "https://github.com/EnderKraken914/bomb-client/releases/latest";
         private TrackBar opacityTrack;
         private Label opacityLabel;
         private TrackBar overlayScaleTrack;
@@ -852,6 +885,11 @@ namespace BombClient
         public MainForm()
         {
             settings = AppSettings.Load();
+            moduleStates = ClientModuleConfigStore.Load();
+            SyncModuleStatesFromSettings();
+            serverProfiles = ServerProfileStore.Load();
+            managedPacks = ManagedPackStore.Load();
+            BridgeManager.RefreshStatus();
             OverlayManager.Configure(settings);
 
             Text = "Bomb Client";
@@ -896,27 +934,35 @@ namespace BombClient
             topBar.Controls.Add(title);
 
             Panel navStrip = new Panel();
-            navStrip.Size = new Size(420, 48);
+            navStrip.Size = new Size(456, 48);
             navStrip.BackColor = Color.FromArgb(13, 18, 22);
             navStrip.Location = new Point(420, 20);
             topBar.Controls.Add(navStrip);
 
             Button navPlay = CreateTopNavButton("Play");
-            Button navMods = CreateTopNavButton("Mods");
+            Button navMods = CreateTopNavButton("Modules");
             Button navVisuals = CreateTopNavButton("Visuals");
             Button navServers = CreateTopNavButton("Servers");
-            navPlay.Location = new Point(10, 7);
-            navMods.Location = new Point(112, 7);
-            navVisuals.Location = new Point(214, 7);
-            navServers.Location = new Point(316, 7);
+            Button navPacks = CreateTopNavButton("Packs");
+            Button navUpdates = CreateTopNavButton("Updates");
+            navPlay.Location = new Point(8, 7);
+            navMods.Location = new Point(82, 7);
+            navVisuals.Location = new Point(156, 7);
+            navServers.Location = new Point(230, 7);
+            navPacks.Location = new Point(304, 7);
+            navUpdates.Location = new Point(378, 7);
             navStrip.Controls.Add(navPlay);
             navStrip.Controls.Add(navMods);
             navStrip.Controls.Add(navVisuals);
             navStrip.Controls.Add(navServers);
+            navStrip.Controls.Add(navPacks);
+            navStrip.Controls.Add(navUpdates);
             RegisterPageButton("Home", navPlay);
             RegisterPageButton("Overlays", navMods);
             RegisterPageButton("Visual", navVisuals);
-            RegisterPageButton("Settings", navServers);
+            RegisterPageButton("Servers", navServers);
+            RegisterPageButton("Packs", navPacks);
+            RegisterPageButton("Updates", navUpdates);
 
             accountPillButton = CreateAccountPillButton();
             UpdateAccountPill();
@@ -982,24 +1028,35 @@ namespace BombClient
             Panel profilesPage = BuildProfilesPage();
             Panel accountPage = BuildAccountPage();
             Panel visualPage = BuildVisualPage();
+            Panel serversPage = BuildServersPage();
+            Panel packsPage = BuildPacksPage();
+            Panel updatesPage = BuildUpdatesPage();
             Panel settingsPage = BuildSettingsPage();
             pages["Home"] = homePage;
             pages["Overlays"] = overlaysPage;
             pages["Profiles"] = profilesPage;
             pages["Account"] = accountPage;
             pages["Visual"] = visualPage;
+            pages["Servers"] = serversPage;
+            pages["Packs"] = packsPage;
+            pages["Updates"] = updatesPage;
             pages["Settings"] = settingsPage;
             content.Controls.Add(homePage);
             content.Controls.Add(overlaysPage);
             content.Controls.Add(profilesPage);
             content.Controls.Add(accountPage);
             content.Controls.Add(visualPage);
+            content.Controls.Add(serversPage);
+            content.Controls.Add(packsPage);
+            content.Controls.Add(updatesPage);
             content.Controls.Add(settingsPage);
 
             navPlay.Click += delegate { ShowPage("Home"); };
             navMods.Click += delegate { ShowPage("Overlays"); };
             navVisuals.Click += delegate { ShowPage("Visual"); };
-            navServers.Click += delegate { ShowPage("Settings"); };
+            navServers.Click += delegate { ShowPage("Servers"); };
+            navPacks.Click += delegate { ShowPage("Packs"); };
+            navUpdates.Click += delegate { ShowPage("Updates"); };
             ShowPage("Home");
 
             statusTimer = new Timer();
@@ -1013,6 +1070,9 @@ namespace BombClient
             {
                 PersistSettingsFromUi();
                 settings.Save();
+                ClientModuleConfigStore.Save(moduleStates);
+                ServerProfileStore.Save(serverProfiles);
+                ManagedPackStore.Save(managedPacks);
             };
         }
 
@@ -1101,12 +1161,12 @@ namespace BombClient
         {
             Button button = new Button();
             button.Text = label;
-            button.Size = new Size(94, 34);
+            button.Size = new Size(70, 34);
             button.FlatStyle = FlatStyle.Flat;
             button.FlatAppearance.BorderSize = 0;
             button.BackColor = Color.FromArgb(13, 18, 22);
             button.ForeColor = muted;
-            button.Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
+            button.Font = new Font("Segoe UI Semibold", 8.4f, FontStyle.Bold);
             button.Cursor = Cursors.Hand;
             return button;
         }
@@ -1452,13 +1512,64 @@ namespace BombClient
         private Panel BuildOverlaysPage()
         {
             Panel page = CreatePage();
-            Label heading = CreateHeading("Overlays");
+            Label heading = CreateHeading("Modules");
             heading.Location = new Point(0, 0);
             page.Controls.Add(heading);
 
+            moduleSearchBox = new TextBox();
+            moduleSearchBox.Location = new Point(0, 50);
+            moduleSearchBox.Size = new Size(260, 24);
+            moduleSearchBox.BackColor = Color.FromArgb(30, 37, 51);
+            moduleSearchBox.ForeColor = text;
+            moduleSearchBox.BorderStyle = BorderStyle.FixedSingle;
+            moduleSearchBox.TextChanged += delegate { RefreshModuleCards(); };
+            page.Controls.Add(moduleSearchBox);
+
+            moduleCategoryBox = new ComboBox();
+            moduleCategoryBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            moduleCategoryBox.BackColor = Color.FromArgb(30, 37, 51);
+            moduleCategoryBox.ForeColor = text;
+            moduleCategoryBox.FlatStyle = FlatStyle.Flat;
+            moduleCategoryBox.Location = new Point(280, 50);
+            moduleCategoryBox.Size = new Size(150, 24);
+            foreach (string category in ClientModuleCatalog.Categories)
+                moduleCategoryBox.Items.Add(category);
+            if (moduleCategoryBox.Items.Count > 0)
+                moduleCategoryBox.SelectedIndex = 0;
+            moduleCategoryBox.SelectedIndexChanged += delegate { RefreshModuleCards(); };
+            page.Controls.Add(moduleCategoryBox);
+
+            Button resetLayout = CreateSecondaryButton("Reset Layout");
+            resetLayout.Location = new Point(450, 44);
+            resetLayout.Size = new Size(126, 36);
+            resetLayout.Click += delegate { ResetOverlayLayout(); };
+            page.Controls.Add(resetLayout);
+
+            Button export = CreateSecondaryButton("Export");
+            export.Location = new Point(592, 44);
+            export.Size = new Size(90, 36);
+            export.Click += delegate { ExportSettings(); };
+            page.Controls.Add(export);
+
+            Button import = CreateSecondaryButton("Import");
+            import.Location = new Point(696, 44);
+            import.Size = new Size(90, 36);
+            import.Click += delegate { ImportSettings(); };
+            page.Controls.Add(import);
+
+            Panel safeCard = CreateCard(0, 92, 786, 70);
+            page.Controls.Add(safeCard);
+            Label safeTitle = CreateCardTitle("Safe External Client");
+            safeTitle.Location = new Point(18, 12);
+            safeCard.Controls.Add(safeTitle);
+            Label safeText = CreateMutedLabel("Bomb Client modules are external: no DLL injection, memory editing, packet manipulation, traffic modification, or installed Bedrock file edits.");
+            safeText.Location = new Point(20, 40);
+            safeText.Size = new Size(730, 24);
+            safeCard.Controls.Add(safeText);
+
             overlayFlow = new FlowLayoutPanel();
-            overlayFlow.Location = new Point(0, 54);
-            overlayFlow.Size = new Size(page.Width, page.Height - 54);
+            overlayFlow.Location = new Point(0, 180);
+            overlayFlow.Size = new Size(page.Width, page.Height - 180);
             overlayFlow.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             overlayFlow.AutoScroll = true;
             overlayFlow.WrapContents = true;
@@ -1467,8 +1578,8 @@ namespace BombClient
             overlayFlow.Resize += delegate { ResizeOverlayCards(); };
             page.Controls.Add(overlayFlow);
 
-            foreach (OverlayDefinition def in OverlayCatalog.All)
-                overlayFlow.Controls.Add(CreateOverlayCard(def));
+            foreach (ClientModuleDefinition module in ClientModuleCatalog.All)
+                overlayFlow.Controls.Add(CreateModuleCard(module));
 
             ResizeOverlayCards();
 
@@ -1561,12 +1672,209 @@ namespace BombClient
             Label clientTitle = CreateCardTitle("Client Hub Behavior");
             clientTitle.Location = new Point(20, 18);
             clientCard.Controls.Add(clientTitle);
-            Label clientNote = CreateMutedLabel("Bomb Client now launches profiles, keeps overlay presets, builds the PvP visual pack, and starts external HUD modules around Bedrock. External clients cannot safely replace Bedrock's built-in version system the same way Feather manages Java installations, but profiles make the workflow similar.");
+            Label clientNote = CreateMutedLabel("Bomb Client launches profiles, keeps overlay/server presets, manages optional packs, and starts external HUD modules around Bedrock. External clients cannot safely replace Bedrock's built-in version system the same way Feather manages Java installations, but profiles make the workflow similar.");
             clientNote.Location = new Point(22, 58);
             clientNote.Size = new Size(620, 78);
             clientCard.Controls.Add(clientNote);
 
             return page;
+        }
+
+        private Panel CreateModuleCard(ClientModuleDefinition module)
+        {
+            Panel card = new Panel();
+            card.Width = 420;
+            card.Height = 150;
+            card.Margin = new Padding(0, 0, 16, 16);
+            card.BackColor = panel;
+            card.Tag = module;
+            card.Paint += delegate(object sender, PaintEventArgs e)
+            {
+                DrawRoundedPanel(e.Graphics, card.ClientRectangle, panel, 8);
+            };
+
+            Label title = CreateCardTitle(module.DisplayName);
+            title.Location = new Point(18, 14);
+            title.Size = new Size(250, 26);
+            card.Controls.Add(title);
+
+            Label category = CreateMutedLabel(module.Category);
+            category.Location = new Point(20, 42);
+            category.Size = new Size(160, 22);
+            card.Controls.Add(category);
+
+            Label desc = CreateMutedLabel(module.Description);
+            desc.Location = new Point(20, 66);
+            desc.Size = new Size(270, 46);
+            card.Controls.Add(desc);
+
+            Label settingsSummary = CreateMutedLabel(ModuleSettingsSummary(module));
+            settingsSummary.Location = new Point(20, 114);
+            settingsSummary.Size = new Size(270, 22);
+            card.Controls.Add(settingsSummary);
+
+            Button toggle = CreateToggleButton(IsModuleEnabled(module));
+            toggle.Location = new Point(308, 38);
+            toggle.Click += delegate
+            {
+                bool next = !IsModuleEnabled(module);
+                SetModuleEnabled(module, next);
+                UpdateToggleButton(toggle, next);
+            };
+            toggleButtons[module.Id] = toggle;
+            card.Controls.Add(toggle);
+
+            Button settingsButton = CreateSecondaryButton("Settings");
+            settingsButton.Location = new Point(308, 88);
+            settingsButton.Size = new Size(90, 34);
+            settingsButton.Click += delegate { OpenModuleSettings(module); };
+            card.Controls.Add(settingsButton);
+
+            card.Resize += delegate
+            {
+                toggle.Location = new Point(Math.Max(224, card.Width - 104), 38);
+                settingsButton.Location = new Point(Math.Max(224, card.Width - 104), 88);
+                title.Size = new Size(Math.Max(180, card.Width - 144), 26);
+                desc.Size = new Size(Math.Max(180, card.Width - 150), 46);
+                settingsSummary.Size = new Size(Math.Max(180, card.Width - 150), 22);
+                card.Invalidate();
+            };
+
+            return card;
+        }
+
+        private string ModuleSettingsSummary(ClientModuleDefinition module)
+        {
+            if (module.Settings.Length == 0)
+                return "Settings: saved automatically";
+
+            List<string> names = new List<string>();
+            foreach (ModuleSettingDefinition setting in module.Settings)
+                names.Add(setting.DisplayName);
+            return "Settings: " + string.Join(", ", names.ToArray());
+        }
+
+        private bool IsModuleEnabled(ClientModuleDefinition module)
+        {
+            string overlayId = ClientModuleCatalog.OverlayIdFromModule(module.Id);
+            if (overlayId.Length > 0)
+                return IsOverlayEnabled(overlayId);
+            return ClientModuleConfigStore.IsEnabled(moduleStates, module);
+        }
+
+        private void SetModuleEnabled(ClientModuleDefinition module, bool enabled)
+        {
+            ClientModuleConfigStore.SetEnabled(moduleStates, module, enabled);
+            string overlayId = ClientModuleCatalog.OverlayIdFromModule(module.Id);
+            if (overlayId.Length > 0)
+            {
+                settings.Overlays[overlayId] = enabled;
+                settings.Save();
+                OverlayManager.SetOverlay(overlayId, enabled);
+            }
+            ClientModuleConfigStore.Save(moduleStates);
+            SetStatus(module.DisplayName + (enabled ? " enabled." : " disabled."));
+        }
+
+        private void RefreshModuleCards()
+        {
+            if (overlayFlow == null)
+                return;
+
+            string search = moduleSearchBox == null ? "" : moduleSearchBox.Text.Trim();
+            string category = moduleCategoryBox == null || moduleCategoryBox.SelectedItem == null ? "All" : moduleCategoryBox.SelectedItem.ToString();
+            foreach (Control control in overlayFlow.Controls)
+            {
+                ClientModuleDefinition module = control.Tag as ClientModuleDefinition;
+                if (module == null)
+                    continue;
+
+                bool matchesCategory = category == "All" || string.Equals(module.Category, category, StringComparison.OrdinalIgnoreCase);
+                bool matchesSearch = search.Length == 0 ||
+                    module.DisplayName.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    module.Description.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    module.Category.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0;
+                control.Visible = matchesCategory && matchesSearch;
+            }
+        }
+
+        private void OpenModuleSettings(ClientModuleDefinition module)
+        {
+            string overlayId = ClientModuleCatalog.OverlayIdFromModule(module.Id);
+            if (overlayId == "clientvisuals")
+            {
+                ShowPage("Visual");
+                return;
+            }
+            if (module.Category == "Servers")
+            {
+                ShowPage("Servers");
+                return;
+            }
+            if (module.Category == "Packs")
+            {
+                ShowPage("Packs");
+                return;
+            }
+            if (module.Category == "Updates")
+            {
+                ShowPage("Updates");
+                return;
+            }
+            if (module.Category == "Profiles")
+            {
+                ShowPage("Profiles");
+                return;
+            }
+            if (module.Category == "Account")
+            {
+                ShowPage("Account");
+                return;
+            }
+
+            MessageBox.Show(
+                module.DisplayName + "\n\n" +
+                module.Description + "\n\n" +
+                ModuleSettingsSummary(module),
+                "Bomb Client Module",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+
+        private void ResetOverlayLayout()
+        {
+            settings.Positions.Clear();
+            settings.Save();
+            OverlayManager.CloseAll();
+            OverlayManager.Configure(settings);
+            OverlayManager.ApplyConfiguredOverlays();
+            SetStatus("Overlay layout reset.");
+        }
+
+        private void ExportSettings()
+        {
+            PersistSettingsFromUi();
+            settings.Save();
+            ClientModuleConfigStore.Save(moduleStates);
+
+            SaveFileDialog dialog = new SaveFileDialog();
+            dialog.Filter = "Bomb Client settings (*.ini)|*.ini|All files (*.*)|*.*";
+            dialog.FileName = "BombClient-settings.ini";
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return;
+            File.Copy(AppPaths.SettingsFile, dialog.FileName, true);
+            SetStatus("Settings exported.");
+        }
+
+        private void ImportSettings()
+        {
+            OpenFileDialog dialog = new OpenFileDialog();
+            dialog.Filter = "Bomb Client settings (*.ini)|*.ini|All files (*.*)|*.*";
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return;
+            Directory.CreateDirectory(AppPaths.DataRoot);
+            File.Copy(dialog.FileName, AppPaths.SettingsFile, true);
+            SetStatus("Settings imported. Restart Bomb Client to reload all fields.");
         }
 
         private void ResizeOverlayCards()
@@ -1669,6 +1977,21 @@ namespace BombClient
                 ? "Connected: " + EmptyFallback(settings.AccountSignedInAt, "Unknown") + ". Bomb Client stores only this display info, not Microsoft password or tokens."
                 : "Click Sign in with Microsoft to open the official Microsoft authentication page and connect this tab.";
             UpdateAccountPill();
+        }
+
+        private void SyncModuleStatesFromSettings()
+        {
+            foreach (OverlayDefinition overlay in OverlayCatalog.All)
+            {
+                ClientModuleDefinition module = ClientModuleCatalog.Find("overlay." + overlay.Id);
+                if (module == null)
+                    continue;
+
+                bool enabled = overlay.DefaultEnabled;
+                settings.Overlays.TryGetValue(overlay.Id, out enabled);
+                ClientModuleConfigStore.SetEnabled(moduleStates, module, enabled);
+            }
+            ClientModuleConfigStore.Save(moduleStates);
         }
 
         private static string EmptyFallback(string value, string fallback)
@@ -1804,6 +2127,620 @@ namespace BombClient
             RefreshAccountLabels();
 
             return page;
+        }
+
+        private Panel BuildServersPage()
+        {
+            Panel page = CreatePage();
+            page.AutoScroll = true;
+            Label heading = CreateHeading("Servers");
+            heading.Location = new Point(0, 0);
+            page.Controls.Add(heading);
+
+            Panel listCard = CreateCard(0, 54, 350, 420);
+            page.Controls.Add(listCard);
+            Label listTitle = CreateCardTitle("Server Profiles");
+            listTitle.Location = new Point(20, 18);
+            listCard.Controls.Add(listTitle);
+
+            serverProfileList = new ListBox();
+            serverProfileList.Location = new Point(20, 56);
+            serverProfileList.Size = new Size(310, 250);
+            serverProfileList.BackColor = Color.FromArgb(14, 18, 24);
+            serverProfileList.ForeColor = text;
+            serverProfileList.BorderStyle = BorderStyle.FixedSingle;
+            serverProfileList.SelectedIndexChanged += delegate { LoadSelectedServerProfile(); };
+            listCard.Controls.Add(serverProfileList);
+
+            Button newServer = CreateSecondaryButton("New");
+            newServer.Location = new Point(20, 322);
+            newServer.Size = new Size(88, 36);
+            newServer.Click += delegate { NewServerProfile(); };
+            listCard.Controls.Add(newServer);
+
+            Button deleteServer = CreateSecondaryButton("Delete");
+            deleteServer.Location = new Point(122, 322);
+            deleteServer.Size = new Size(88, 36);
+            deleteServer.Click += delegate { DeleteSelectedServerProfile(); };
+            listCard.Controls.Add(deleteServer);
+
+            Button useServer = CreatePrimaryButton("Use");
+            useServer.Location = new Point(224, 322);
+            useServer.Size = new Size(88, 36);
+            useServer.Click += delegate { UseSelectedServerProfile(); };
+            listCard.Controls.Add(useServer);
+
+            Label listNote = CreateMutedLabel("Public servers use only saved info, safe ping/status checks, local stats, overlays, notes, and user presets.");
+            listNote.Location = new Point(22, 372);
+            listNote.Size = new Size(300, 36);
+            listCard.Controls.Add(listNote);
+
+            Panel editCard = CreateCard(374, 54, 530, 420);
+            page.Controls.Add(editCard);
+            Label editTitle = CreateCardTitle("Profile Details");
+            editTitle.Location = new Point(20, 18);
+            editCard.Controls.Add(editTitle);
+
+            Label nameLabel = CreateMutedLabel("Name");
+            nameLabel.Location = new Point(22, 62);
+            nameLabel.Size = new Size(90, 24);
+            editCard.Controls.Add(nameLabel);
+            serverProfileNameBox = CreateDarkTextBox(120, 60, 250);
+            editCard.Controls.Add(serverProfileNameBox);
+
+            serverProfileFavoriteCheck = CreateCheck("Favorite", false);
+            serverProfileFavoriteCheck.Location = new Point(392, 62);
+            editCard.Controls.Add(serverProfileFavoriteCheck);
+
+            Label hostLabel = CreateMutedLabel("IP / Host");
+            hostLabel.Location = new Point(22, 102);
+            hostLabel.Size = new Size(90, 24);
+            editCard.Controls.Add(hostLabel);
+            serverProfileHostBox = CreateDarkTextBox(120, 100, 250);
+            editCard.Controls.Add(serverProfileHostBox);
+
+            Label portLabel = CreateMutedLabel("Port");
+            portLabel.Location = new Point(392, 102);
+            portLabel.Size = new Size(60, 24);
+            editCard.Controls.Add(portLabel);
+            serverProfilePortBox = new NumericUpDown();
+            serverProfilePortBox.Minimum = 1;
+            serverProfilePortBox.Maximum = 65535;
+            serverProfilePortBox.Value = 19132;
+            serverProfilePortBox.Location = new Point(438, 100);
+            serverProfilePortBox.Size = new Size(70, 24);
+            serverProfilePortBox.BackColor = Color.FromArgb(30, 37, 51);
+            serverProfilePortBox.ForeColor = text;
+            editCard.Controls.Add(serverProfilePortBox);
+
+            Label categoryLabel = CreateMutedLabel("Category");
+            categoryLabel.Location = new Point(22, 142);
+            categoryLabel.Size = new Size(90, 24);
+            editCard.Controls.Add(categoryLabel);
+            serverProfileCategoryBox = new ComboBox();
+            serverProfileCategoryBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            serverProfileCategoryBox.BackColor = Color.FromArgb(30, 37, 51);
+            serverProfileCategoryBox.ForeColor = text;
+            serverProfileCategoryBox.FlatStyle = FlatStyle.Flat;
+            serverProfileCategoryBox.Location = new Point(120, 140);
+            serverProfileCategoryBox.Size = new Size(160, 24);
+            foreach (string category in ServerProfileStore.Categories)
+                serverProfileCategoryBox.Items.Add(category);
+            serverProfileCategoryBox.SelectedIndex = 4;
+            editCard.Controls.Add(serverProfileCategoryBox);
+
+            Label packsLabel = CreateMutedLabel("Recommended packs");
+            packsLabel.Location = new Point(22, 182);
+            packsLabel.Size = new Size(130, 24);
+            editCard.Controls.Add(packsLabel);
+            serverProfilePacksBox = CreateDarkTextBox(160, 180, 348);
+            editCard.Controls.Add(serverProfilePacksBox);
+
+            Label notesLabel = CreateMutedLabel("Notes");
+            notesLabel.Location = new Point(22, 222);
+            notesLabel.Size = new Size(90, 24);
+            editCard.Controls.Add(notesLabel);
+            serverProfileNotesBox = CreateDarkTextBox(120, 220, 388);
+            serverProfileNotesBox.Multiline = true;
+            serverProfileNotesBox.Height = 80;
+            editCard.Controls.Add(serverProfileNotesBox);
+
+            Button saveServer = CreatePrimaryButton("Save Profile");
+            saveServer.Location = new Point(22, 320);
+            saveServer.Size = new Size(140, 38);
+            saveServer.Click += delegate { SaveSelectedServerProfile(); };
+            editCard.Controls.Add(saveServer);
+
+            Button pingServer = CreateSecondaryButton("Safe Ping");
+            pingServer.Location = new Point(180, 320);
+            pingServer.Size = new Size(120, 38);
+            pingServer.Click += delegate { PingSelectedServerProfile(); };
+            editCard.Controls.Add(pingServer);
+
+            serverProfileStatusLabel = CreateMutedLabel("Status: not checked");
+            serverProfileStatusLabel.Location = new Point(22, 372);
+            serverProfileStatusLabel.Size = new Size(470, 28);
+            editCard.Controls.Add(serverProfileStatusLabel);
+
+            Panel bridgeCard = CreateCard(0, 500, 904, 292);
+            page.Controls.Add(bridgeCard);
+            Label bridgeTitle = CreateCardTitle("Bomb Server Bridge");
+            bridgeTitle.Location = new Point(20, 18);
+            bridgeCard.Controls.Add(bridgeTitle);
+
+            Label bridgeNote = CreateMutedLabel("Optional cooperating-server API. Disabled by default. No packet sniffing, traffic modification, injection, memory reading, or fake server-side data.");
+            bridgeNote.Location = new Point(22, 50);
+            bridgeNote.Size = new Size(820, 34);
+            bridgeCard.Controls.Add(bridgeNote);
+
+            bridgeEnabledCheck = CreateCheck("Enable bridge", BridgeManager.Settings.Enabled);
+            bridgeEnabledCheck.Location = new Point(22, 96);
+            bridgeCard.Controls.Add(bridgeEnabledCheck);
+
+            bridgeMockCheck = CreateCheck("Mock/test mode", BridgeManager.Settings.MockMode);
+            bridgeMockCheck.Location = new Point(160, 96);
+            bridgeCard.Controls.Add(bridgeMockCheck);
+
+            Label urlLabel = CreateMutedLabel("HTTP/WebSocket URL");
+            urlLabel.Location = new Point(22, 138);
+            urlLabel.Size = new Size(150, 24);
+            bridgeCard.Controls.Add(urlLabel);
+            bridgeUrlBox = CreateDarkTextBox(176, 136, 420);
+            bridgeUrlBox.Text = BridgeManager.Settings.Url;
+            bridgeCard.Controls.Add(bridgeUrlBox);
+
+            Button saveBridge = CreatePrimaryButton("Save Bridge");
+            saveBridge.Location = new Point(616, 130);
+            saveBridge.Size = new Size(130, 38);
+            saveBridge.Click += delegate { SaveBridgeSettingsFromUi(); };
+            bridgeCard.Controls.Add(saveBridge);
+
+            Button startMock = CreateSecondaryButton("Start Mock");
+            startMock.Location = new Point(22, 184);
+            startMock.Size = new Size(120, 38);
+            startMock.Click += delegate
+            {
+                BridgeManager.StartMock();
+                RefreshBridgeLabels();
+                SetStatus("Bridge mock mode connected.");
+            };
+            bridgeCard.Controls.Add(startMock);
+
+            Button stopBridge = CreateSecondaryButton("Stop");
+            stopBridge.Location = new Point(158, 184);
+            stopBridge.Size = new Size(90, 38);
+            stopBridge.Click += delegate
+            {
+                BridgeManager.Stop();
+                RefreshBridgeLabels();
+                SetStatus("Bridge stopped.");
+            };
+            bridgeCard.Controls.Add(stopBridge);
+
+            bridgeStatusLabel = CreateMutedLabel("Bridge status: " + BridgeManager.Status);
+            bridgeStatusLabel.Location = new Point(270, 192);
+            bridgeStatusLabel.Size = new Size(320, 28);
+            bridgeCard.Controls.Add(bridgeStatusLabel);
+
+            TextBox example = CreateDarkTextBox(616, 184, 250);
+            example.Multiline = true;
+            example.Height = 82;
+            example.ReadOnly = true;
+            example.Text = BridgeManager.ExampleJson();
+            bridgeCard.Controls.Add(example);
+
+            RefreshServerProfileList();
+            RefreshBridgeLabels();
+            return page;
+        }
+
+        private Panel BuildPacksPage()
+        {
+            Panel page = CreatePage();
+            page.AutoScroll = true;
+            Label heading = CreateHeading("Packs");
+            heading.Location = new Point(0, 0);
+            page.Controls.Add(heading);
+
+            Panel card = CreateCard(0, 54, 760, 430);
+            page.Controls.Add(card);
+            Label title = CreateCardTitle("Add-On / Resource Pack Manager");
+            title.Location = new Point(20, 18);
+            card.Controls.Add(title);
+
+            Label note = CreateMutedLabel("Packs are optional managed files for worlds or servers that intentionally support them. Bomb Client visuals stay in the external client layer and installed Bedrock files are never edited.");
+            note.Location = new Point(22, 50);
+            note.Size = new Size(690, 38);
+            card.Controls.Add(note);
+
+            managedPackList = new ListBox();
+            managedPackList.Location = new Point(22, 104);
+            managedPackList.Size = new Size(470, 250);
+            managedPackList.BackColor = Color.FromArgb(14, 18, 24);
+            managedPackList.ForeColor = text;
+            managedPackList.BorderStyle = BorderStyle.FixedSingle;
+            card.Controls.Add(managedPackList);
+
+            Button importPack = CreatePrimaryButton("Import Pack");
+            importPack.Location = new Point(520, 104);
+            importPack.Size = new Size(160, 38);
+            importPack.Click += delegate { ImportManagedPack(); };
+            card.Controls.Add(importPack);
+
+            Button togglePack = CreateSecondaryButton("Enable / Disable");
+            togglePack.Location = new Point(520, 156);
+            togglePack.Size = new Size(160, 38);
+            togglePack.Click += delegate { ToggleSelectedManagedPack(); };
+            card.Controls.Add(togglePack);
+
+            Button openManaged = CreateSecondaryButton("Open Managed");
+            openManaged.Location = new Point(520, 208);
+            openManaged.Size = new Size(160, 38);
+            openManaged.Click += delegate { OpenFolder(ManagedPackStore.ManagedRoot); };
+            card.Controls.Add(openManaged);
+
+            Button openResources = CreateSecondaryButton("Resource Folder");
+            openResources.Location = new Point(520, 260);
+            openResources.Size = new Size(160, 38);
+            openResources.Click += delegate { OpenFolder(ManagedPackStore.ResourceDevelopmentFolder()); };
+            card.Controls.Add(openResources);
+
+            Button openBehaviors = CreateSecondaryButton("Behavior Folder");
+            openBehaviors.Location = new Point(520, 312);
+            openBehaviors.Size = new Size(160, 38);
+            openBehaviors.Click += delegate { OpenFolder(ManagedPackStore.BehaviorDevelopmentFolder()); };
+            card.Controls.Add(openBehaviors);
+
+            Button generate = CreateSecondaryButton("Generate Optional Pack");
+            generate.Location = new Point(22, 372);
+            generate.Size = new Size(190, 38);
+            generate.Click += delegate { GenerateOptionalVisualPack(); };
+            card.Controls.Add(generate);
+
+            Label limit = CreateMutedLabel("Generated packs are optional local Bedrock packs. Public-server support still comes from Bomb Client's external overlay/profile systems.");
+            limit.Location = new Point(230, 378);
+            limit.Size = new Size(480, 26);
+            card.Controls.Add(limit);
+
+            RefreshManagedPackList();
+            return page;
+        }
+
+        private Panel BuildUpdatesPage()
+        {
+            Panel page = CreatePage();
+            page.AutoScroll = true;
+            Label heading = CreateHeading("Latest Updates");
+            heading.Location = new Point(0, 0);
+            page.Controls.Add(heading);
+
+            Panel card = CreateCard(0, 54, 820, 500);
+            page.Controls.Add(card);
+            Label title = CreateCardTitle("Bomb Client Update Hub");
+            title.Location = new Point(20, 18);
+            card.Controls.Add(title);
+
+            latestInstalledLabel = CreateMutedLabel("");
+            latestInstalledLabel.Location = new Point(22, 58);
+            latestInstalledLabel.Size = new Size(360, 26);
+            card.Controls.Add(latestInstalledLabel);
+
+            latestAvailableLabel = CreateMutedLabel("");
+            latestAvailableLabel.Location = new Point(22, 90);
+            latestAvailableLabel.Size = new Size(360, 26);
+            card.Controls.Add(latestAvailableLabel);
+
+            latestReleaseDateLabel = CreateMutedLabel("");
+            latestReleaseDateLabel.Location = new Point(22, 122);
+            latestReleaseDateLabel.Size = new Size(360, 26);
+            card.Controls.Add(latestReleaseDateLabel);
+
+            latestStatusLabel = CreateMutedLabel("");
+            latestStatusLabel.Location = new Point(22, 154);
+            latestStatusLabel.Size = new Size(720, 34);
+            card.Controls.Add(latestStatusLabel);
+
+            latestChangelogBox = CreateDarkTextBox(22, 204, 760);
+            latestChangelogBox.Multiline = true;
+            latestChangelogBox.ReadOnly = true;
+            latestChangelogBox.ScrollBars = ScrollBars.Vertical;
+            latestChangelogBox.Height = 210;
+            card.Controls.Add(latestChangelogBox);
+
+            Button refresh = CreatePrimaryButton("Refresh");
+            refresh.Location = new Point(22, 438);
+            refresh.Size = new Size(120, 38);
+            refresh.Click += delegate { RefreshLatestUpdates(); };
+            card.Controls.Add(refresh);
+
+            Button openRelease = CreateSecondaryButton("Open Release");
+            openRelease.Location = new Point(160, 438);
+            openRelease.Size = new Size(140, 38);
+            openRelease.Click += delegate { OpenAccountTarget(latestReleaseUrl, "GitHub release page opened."); };
+            card.Controls.Add(openRelease);
+
+            DisplayUpdateManifest(UpdateChecker.ParseManifest(LocalUpdateJson()));
+            return page;
+        }
+
+        private TextBox CreateDarkTextBox(int x, int y, int width)
+        {
+            TextBox box = new TextBox();
+            box.Location = new Point(x, y);
+            box.Size = new Size(width, 24);
+            box.BackColor = Color.FromArgb(30, 37, 51);
+            box.ForeColor = text;
+            box.BorderStyle = BorderStyle.FixedSingle;
+            return box;
+        }
+
+        private void RefreshServerProfileList()
+        {
+            if (serverProfileList == null)
+                return;
+            serverProfileList.Items.Clear();
+            foreach (ServerProfile profile in serverProfiles)
+                serverProfileList.Items.Add(profile);
+            if (serverProfileList.Items.Count > 0 && serverProfileList.SelectedIndex < 0)
+                serverProfileList.SelectedIndex = 0;
+        }
+
+        private ServerProfile SelectedServerProfile()
+        {
+            if (serverProfileList == null)
+                return null;
+            return serverProfileList.SelectedItem as ServerProfile;
+        }
+
+        private void LoadSelectedServerProfile()
+        {
+            ServerProfile profile = SelectedServerProfile();
+            if (profile == null)
+                return;
+            serverProfileNameBox.Text = profile.Name;
+            serverProfileHostBox.Text = profile.Host;
+            serverProfilePortBox.Value = Math.Max(serverProfilePortBox.Minimum, Math.Min(serverProfilePortBox.Maximum, profile.Port));
+            serverProfileFavoriteCheck.Checked = profile.Favorite;
+            SelectComboText(serverProfileCategoryBox, profile.Category);
+            serverProfilePacksBox.Text = profile.RecommendedPacks;
+            serverProfileNotesBox.Text = profile.Notes;
+            serverProfileStatusLabel.Text = "Status: " + profile.Host + ":" + profile.Port.ToString();
+        }
+
+        private void SaveSelectedServerProfile()
+        {
+            ServerProfile profile = SelectedServerProfile();
+            if (profile == null)
+                return;
+            profile.Name = serverProfileNameBox.Text.Trim().Length == 0 ? "New Server" : serverProfileNameBox.Text.Trim();
+            profile.Host = serverProfileHostBox.Text.Trim().Length == 0 ? "play.cubecraft.net" : serverProfileHostBox.Text.Trim();
+            profile.Port = (int)serverProfilePortBox.Value;
+            profile.Category = serverProfileCategoryBox.SelectedItem == null ? "Custom" : serverProfileCategoryBox.SelectedItem.ToString();
+            profile.Favorite = serverProfileFavoriteCheck.Checked;
+            profile.RecommendedPacks = serverProfilePacksBox.Text.Trim();
+            profile.Notes = serverProfileNotesBox.Text.Trim();
+            ServerProfileStore.Save(serverProfiles);
+            RefreshServerProfileList();
+            SetStatus("Server profile saved.");
+        }
+
+        private void NewServerProfile()
+        {
+            ServerProfile profile = new ServerProfile();
+            profile.Name = "Custom Server";
+            serverProfiles.Add(profile);
+            ServerProfileStore.Save(serverProfiles);
+            RefreshServerProfileList();
+            serverProfileList.SelectedItem = profile;
+            SetStatus("New server profile created.");
+        }
+
+        private void DeleteSelectedServerProfile()
+        {
+            ServerProfile profile = SelectedServerProfile();
+            if (profile == null)
+                return;
+            serverProfiles.Remove(profile);
+            ServerProfileStore.Save(serverProfiles);
+            RefreshServerProfileList();
+            SetStatus("Server profile deleted.");
+        }
+
+        private void UseSelectedServerProfile()
+        {
+            ServerProfile profile = SelectedServerProfile();
+            if (profile == null)
+                return;
+            settings.ServerHost = profile.Host;
+            settings.ServerPort = profile.Port;
+            if (serverHostBox != null)
+                serverHostBox.Text = settings.ServerHost;
+            if (serverPortBox != null)
+                serverPortBox.Value = settings.ServerPort;
+            profile.LastJoinedUtc = DateTime.UtcNow;
+            ServerProfileStore.Save(serverProfiles);
+            settings.Save();
+            OverlayManager.Configure(settings);
+            SetStatus("Active server set to " + profile.Host + ":" + profile.Port.ToString() + ". Launch Bedrock and join normally from the server list.");
+        }
+
+        private void PingSelectedServerProfile()
+        {
+            ServerProfile profile = SelectedServerProfile();
+            if (profile == null)
+                return;
+            serverProfileStatusLabel.Text = "Status: checking...";
+            ServerStatusResult result = ServerProfileStore.CheckStatus(profile);
+            serverProfileStatusLabel.Text = "Status: " + result.Message;
+        }
+
+        private void SelectComboText(ComboBox combo, string value)
+        {
+            if (combo == null)
+                return;
+            for (int i = 0; i < combo.Items.Count; i++)
+            {
+                if (string.Equals(combo.Items[i].ToString(), value, StringComparison.OrdinalIgnoreCase))
+                {
+                    combo.SelectedIndex = i;
+                    return;
+                }
+            }
+            if (combo.Items.Count > 0)
+                combo.SelectedIndex = combo.Items.Count - 1;
+        }
+
+        private void SaveBridgeSettingsFromUi()
+        {
+            BridgeSettings next = new BridgeSettings();
+            next.Enabled = bridgeEnabledCheck != null && bridgeEnabledCheck.Checked;
+            next.MockMode = bridgeMockCheck != null && bridgeMockCheck.Checked;
+            next.Url = bridgeUrlBox == null || bridgeUrlBox.Text.Trim().Length == 0 ? "http://localhost:39132/bomb-client" : bridgeUrlBox.Text.Trim();
+            BridgeManager.SaveSettings(next);
+            BridgeManager.RefreshStatus();
+            RefreshBridgeLabels();
+            SetStatus("Bridge settings saved.");
+        }
+
+        private void RefreshBridgeLabels()
+        {
+            if (bridgeEnabledCheck != null)
+                bridgeEnabledCheck.Checked = BridgeManager.Settings.Enabled;
+            if (bridgeMockCheck != null)
+                bridgeMockCheck.Checked = BridgeManager.Settings.MockMode;
+            if (bridgeUrlBox != null)
+                bridgeUrlBox.Text = BridgeManager.Settings.Url;
+            if (bridgeStatusLabel != null)
+                bridgeStatusLabel.Text = "Bridge status: " + BridgeManager.Status;
+        }
+
+        private void RefreshManagedPackList()
+        {
+            if (managedPackList == null)
+                return;
+            managedPackList.Items.Clear();
+            foreach (ManagedPack pack in managedPacks)
+                managedPackList.Items.Add(pack);
+        }
+
+        private ManagedPack SelectedManagedPack()
+        {
+            if (managedPackList == null)
+                return null;
+            return managedPackList.SelectedItem as ManagedPack;
+        }
+
+        private void ImportManagedPack()
+        {
+            OpenFileDialog dialog = new OpenFileDialog();
+            dialog.Filter = "Bedrock packs (*.mcpack;*.mcaddon;*.zip)|*.mcpack;*.mcaddon;*.zip|All files (*.*)|*.*";
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return;
+            try
+            {
+                ManagedPack pack = ManagedPackStore.Import(dialog.FileName);
+                managedPacks.Add(pack);
+                ManagedPackStore.Save(managedPacks);
+                RefreshManagedPackList();
+                SetStatus("Pack imported into Bomb Client.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Pack import failed.\n\n" + ex.Message, "Bomb Client", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void ToggleSelectedManagedPack()
+        {
+            ManagedPack pack = SelectedManagedPack();
+            if (pack == null)
+                return;
+            pack.Enabled = !pack.Enabled;
+            ManagedPackStore.Save(managedPacks);
+            RefreshManagedPackList();
+            SetStatus(pack.Name + (pack.Enabled ? " enabled." : " disabled."));
+        }
+
+        private void GenerateOptionalVisualPack()
+        {
+            try
+            {
+                PersistSettingsFromUi();
+                string path = ResourcePackBuilder.Build(settings);
+                ManagedPack pack = ManagedPackStore.Import(path);
+                pack.Name = "Bomb Client Optional Visual Pack";
+                managedPacks.Add(pack);
+                ManagedPackStore.Save(managedPacks);
+                RefreshManagedPackList();
+                SetStatus("Optional local visual pack generated.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not generate optional visual pack.\n\n" + ex.Message, "Bomb Client", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void OpenFolder(string path)
+        {
+            try
+            {
+                Directory.CreateDirectory(path);
+                Process.Start(path);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not open folder.\n\n" + ex.Message, "Bomb Client", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void RefreshLatestUpdates()
+        {
+            UpdateManifest manifest = UpdateChecker.FetchManifest();
+            if (manifest == null)
+                manifest = UpdateChecker.ParseManifest(LocalUpdateJson());
+            DisplayUpdateManifest(manifest);
+        }
+
+        private void DisplayUpdateManifest(UpdateManifest manifest)
+        {
+            if (manifest == null)
+                manifest = UpdateChecker.ParseManifest(LocalUpdateJson());
+
+            latestReleaseUrl = manifest.ReleasePage;
+            if (latestInstalledLabel != null)
+                latestInstalledLabel.Text = "Installed version: " + AppInfo.Version;
+            if (latestAvailableLabel != null)
+                latestAvailableLabel.Text = "Latest available: " + manifest.LatestVersion;
+            if (latestReleaseDateLabel != null)
+                latestReleaseDateLabel.Text = "Release date: " + (manifest.ReleaseDate.Length == 0 ? "Unknown" : manifest.ReleaseDate);
+
+            string status = "Bomb Client is up to date.";
+            if (manifest.RequiresUpdate())
+                status = "A required update is available. Players must update before continuing.";
+            else if (manifest.HasOptionalUpdate())
+                status = "A newer optional update is available.";
+
+            if (latestStatusLabel != null)
+                latestStatusLabel.Text = "Update status: " + status;
+            if (latestChangelogBox != null)
+            {
+                string title = manifest.ReleaseTitle.Length == 0 ? "Release notes" : manifest.ReleaseTitle;
+                string body = manifest.Changelog.Length == 0 ? manifest.Notes : manifest.Changelog;
+                latestChangelogBox.Text = title + Environment.NewLine + Environment.NewLine + body;
+            }
+        }
+
+        private string LocalUpdateJson()
+        {
+            return "{\"latest_version\":\"" + AppInfo.Version + "\"," +
+                "\"required_version\":\"" + AppInfo.Version + "\"," +
+                "\"force_update\":true," +
+                "\"release_date\":\"2026-05-29\"," +
+                "\"release_title\":\"Bomb Client 2.0 Core\"," +
+                "\"changelog\":\"Module architecture, server profiles, pack manager, optional bridge foundation, overlay data API, and Latest Updates tab.\"," +
+                "\"github_release_url\":\"https://github.com/EnderKraken914/bomb-client/releases/tag/v2.0.0\"," +
+                "\"release_page\":\"https://github.com/EnderKraken914/bomb-client/releases/tag/v2.0.0\"," +
+                "\"download_url\":\"" + AppInfo.ReleaseDownloadUrl + "\"}";
         }
 
         private Panel BuildVisualPage()
@@ -2672,13 +3609,13 @@ namespace BombClient
             if (id == "session")
                 return new TextOverlayForm(id, 138, 36, delegate { return "SESSION " + SessionClock.ElapsedText; });
             if (id == "memory")
-                return new TextOverlayForm(id, 178, 36, delegate { return MinecraftInfo.MemoryText(); });
+                return new TextOverlayForm(id, 178, 36, delegate { return OverlayDataContext.Current(settings).MemoryStatus; });
             if (id == "system")
-                return new TextOverlayForm(id, 180, 36, delegate { return SystemInfo.StatusText(); });
+                return new TextOverlayForm(id, 180, 36, delegate { return OverlayDataContext.Current(settings).SystemStatus; });
             if (id == "server")
-                return new TextOverlayForm(id, 230, 36, delegate { return settings.ServerHost + ":" + settings.ServerPort.ToString(); });
+                return new TextOverlayForm(id, 270, 36, delegate { return OverlayDataContext.Current(settings).ServerInfoText(); });
             if (id == "status")
-                return new TextOverlayForm(id, 176, 36, delegate { return MinecraftInfo.IsMinecraftRunning() ? "BEDROCK RUNNING" : "BEDROCK CLOSED"; });
+                return new TextOverlayForm(id, 230, 36, delegate { OverlayDataSnapshot data = OverlayDataContext.Current(settings); return (data.MinecraftRunning ? "BEDROCK RUNNING" : "BEDROCK CLOSED") + " | BRIDGE " + data.BridgeStatus.ToUpperInvariant(); });
             if (id == "armor")
                 return new ArmorHudOverlayForm(id);
             if (id == "potions")
@@ -3168,6 +4105,18 @@ namespace BombClient
         protected override void OnPaint(PaintEventArgs e)
         {
             DrawOverlayBack(e.Graphics, ClientRectangle);
+            if (BridgeManager.CurrentData.ArmorHud.Length > 0)
+            {
+                string[] lines = BridgeManager.CurrentData.ArmorHud.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                using (Font font = new Font("Segoe UI Semibold", SF(9f), FontStyle.Bold))
+                {
+                    for (int i = 0; i < lines.Length && i < 6; i++)
+                        TextRenderer.DrawText(e.Graphics, lines[i], font, new Rectangle(S(10), S(10 + (i * 28)), S(78), S(24)), Color.White, TextFormatFlags.Left);
+                }
+                base.OnPaint(e);
+                return;
+            }
+
             string[] names = new string[] { "H", "C", "L", "B" };
             for (int i = 0; i < names.Length; i++)
                 DrawArmorSlot(e.Graphics, names[i], i, 6 + (i * 56));
@@ -3210,12 +4159,21 @@ namespace BombClient
         protected override void OnPaint(PaintEventArgs e)
         {
             DrawOverlayBack(e.Graphics, ClientRectangle);
+            string bridgeEffects = BridgeManager.CurrentData.PotionEffects;
             using (Font effectFont = new Font("Segoe UI Semibold", SF(15f), FontStyle.Bold))
             using (Font timeFont = new Font("Segoe UI", SF(10f), FontStyle.Bold))
             {
-                DrawEffect(e.Graphics, effectFont, timeFont, 14, "Strength II", "00:00");
-                DrawEffect(e.Graphics, effectFont, timeFont, 58, "Fire Resistance I", "00:00");
-                DrawEffect(e.Graphics, effectFont, timeFont, 102, "Speed II", "00:01");
+                if (bridgeEffects.Length > 0)
+                {
+                    string[] lines = bridgeEffects.Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                    for (int i = 0; i < lines.Length && i < 4; i++)
+                        DrawEffect(e.Graphics, effectFont, timeFont, 14 + (i * 34), lines[i], "bridge");
+                }
+                else
+                {
+                    DrawEffect(e.Graphics, effectFont, timeFont, 14, "Potion effects", "unavailable");
+                    DrawEffect(e.Graphics, effectFont, timeFont, 58, "Bridge/mock data", "required");
+                }
             }
             base.OnPaint(e);
         }
@@ -3237,12 +4195,22 @@ namespace BombClient
         protected override void OnPaint(PaintEventArgs e)
         {
             DrawOverlayBack(e.Graphics, ClientRectangle);
-            for (int i = 0; i < 9; i++)
-                DrawSlot(e.Graphics, i);
+            string hotbar = BridgeManager.CurrentData.Hotbar;
+            if (hotbar.Length > 0)
+            {
+                string[] items = hotbar.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < 9; i++)
+                    DrawSlot(e.Graphics, i, i < items.Length ? items[i].Trim() : (i + 1).ToString());
+            }
+            else
+            {
+                for (int i = 0; i < 9; i++)
+                    DrawSlot(e.Graphics, i, i == 0 ? "N/A" : (i + 1).ToString());
+            }
             base.OnPaint(e);
         }
 
-        private void DrawSlot(Graphics g, int index)
+        private void DrawSlot(Graphics g, int index, string label)
         {
             int x = 8 + (index * 31);
             Rectangle rect = new Rectangle(S(x), S(8), S(28), S(32));
@@ -3253,9 +4221,15 @@ namespace BombClient
                 g.DrawRectangle(pen, rect);
             }
 
-            string label = index == 0 ? "T" : (index + 1).ToString();
             using (Font font = new Font("Segoe UI Semibold", SF(9f), FontStyle.Bold))
-                TextRenderer.DrawText(g, label, font, rect, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                TextRenderer.DrawText(g, ShortHotbarLabel(label), font, rect, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        }
+
+        private string ShortHotbarLabel(string value)
+        {
+            if (value == null || value.Length == 0)
+                return "";
+            return value.Length <= 3 ? value : value.Substring(0, 3);
         }
     }
 
@@ -3288,7 +4262,9 @@ namespace BombClient
             {
                 TextRenderer.DrawText(e.Graphics, title, titleFont, new Rectangle(S(14), S(10), S(250), S(28)), Color.White, TextFormatFlags.Left);
                 DrawGrid(e.Graphics, alt);
-                TextRenderer.DrawText(e.Graphics, "External mode: Bedrock item NBT is not exposed to Bomb Client.", noteFont, new Rectangle(S(14), S(194), S(354), S(26)), Color.FromArgb(255, 179, 70), TextFormatFlags.Left);
+                string bridge = BridgeManager.CurrentData.ShulkerPreview;
+                string note = bridge.Length > 0 ? bridge : "External mode: Bedrock item NBT is unavailable without bridge/mock data.";
+                TextRenderer.DrawText(e.Graphics, note, noteFont, new Rectangle(S(14), S(194), S(354), S(26)), Color.FromArgb(255, 179, 70), TextFormatFlags.Left);
             }
             base.OnPaint(e);
         }
