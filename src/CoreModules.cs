@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Windows.Forms;
 
 namespace BombClient
 {
@@ -29,8 +30,15 @@ namespace BombClient
         public readonly string Category;
         public readonly bool DefaultEnabled;
         public readonly ModuleSettingDefinition[] Settings;
+        public readonly Func<Form> RenderHook;
+        public readonly Action UpdateHook;
 
         public ClientModuleDefinition(string id, string displayName, string description, string category, bool defaultEnabled, ModuleSettingDefinition[] settings)
+            : this(id, displayName, description, category, defaultEnabled, settings, null, null)
+        {
+        }
+
+        public ClientModuleDefinition(string id, string displayName, string description, string category, bool defaultEnabled, ModuleSettingDefinition[] settings, Func<Form> renderHook, Action updateHook)
         {
             Id = id;
             DisplayName = displayName;
@@ -38,6 +46,8 @@ namespace BombClient
             Category = category;
             DefaultEnabled = defaultEnabled;
             Settings = settings ?? new ModuleSettingDefinition[0];
+            RenderHook = renderHook;
+            UpdateHook = updateHook;
         }
     }
 
